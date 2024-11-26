@@ -1,0 +1,946 @@
+#!/bin/bash
+#Version 0.1
+#JR@myTeckNet
+#globalVariables
+sVER="0.1 DEMO"
+logfile="/tmp/.takinstall.log"
+RED='\033[0;31m'
+YELLOW='\033[0;33m'
+GREEN='\033[0;32m'
+NC='\033[0m'
+BASEDIR=$(dirname "$(readlink -f "$0")")
+curuser=$(printenv SUDO_USER)
+homeDir=$(cat /etc/passwd | awk -F':' '/'"$curuser"'/ { print $6 }' | head -n 1)
+distro=$(awk -F'=' '/^ID=/ { print tolower($2) }' /etc/*-release | tr -d '"')
+distro_ver=$(awk -F'=' '/^VERSION_ID=/ { print tolower($2) }' /etc/*-release | tr -d '"')
+backTitle="TAK Server Setup Wizard - Version: $sVER"
+
+# Script Abort
+abort() {
+    echo -e "${RED}Task aborted.${NC}"
+    exit 1
+}
+
+#::::::::::
+# Prerequisite Checks
+#::::::::::
+prerequisite(){
+    echo -e "${YELLOW}Conducting Prerequisite Checks...${NC}" 2>&1 | tee -a $logfile
+
+# Determine Linux distribution
+    if [ -z $distro ]; then
+        abort
+    fi
+
+# Determine Linux Version
+    case $distro in
+        rocky|rhel)
+            if [[ $distro_ver =~ 9 ]]; then
+                echo -e "${RED}ERR: Platform Version Unsupported.{NC}"
+                abort
+            else
+                gpgKEY=$(find ${PWD} -name 'takserver-public-gpg.key' -type f -exec ls -t1 {} + | head -1)
+                if [[ ! -f $gpgKEY ]]; then
+                    echo -e "${RED}ERR: takserver-public-gpg.key not found within the directory.${NC}"
+                    abort
+                else
+                    rpm --import "$gpgKEY"
+                fi
+            fi
+        ;;
+        ubuntu|debian)
+            if [[ $distro_ver =~ 23 ]]; then
+                echo -e "${RED}ERR: Platform Version Unsupported.${NC}"
+                abort
+            else
+                debPol=$(find ${PWD} -name 'deb_policy.pol' -type f -exec ls -t1 {} + | head -1)
+                gpgKEY=$(find ${PWD} -name 'takserver-public-gpg.key' -type f -exec ls -t1 {} + | head -1)
+                if [[ ! -f $gpgKEY ]]; then
+                    echo -e "${RED}ERR: takserver-public-gpg.key not found within the directory.${NC}"
+                    abort
+                else
+                    if [[ ! -f $debPol ]]; then
+                        echo -e "${RED}ERR: deb_policy.pol not found within the directory.${NC}"
+                        abort
+                    else
+                        apt install debsig-verify -y 2>&1 | tee -a $logfile
+                        debPolicyID=$(grep -o 'id="[^"]\+"' "${debPol}" | head -1 | tr -d 'id="')
+                        mkdir -p "/usr/share/debsig/keyrings/${debPolicyID}"
+                        mkdir -p "/etc/debsig/policies/${debPolicyID}"
+                        touch /usr/share/debsig/keyrings/${debPolicyID}/debsig.gpg
+                        gpg --no-default-keyring --keyring /usr/share/debsig/keyrings/${debPolicyID}/debsig.gpg --import ${gpgKEY}
+                        cp ${debPol} /etc/debsig/policies/${debPolicyID}/debsig.pol
+                        verify_deb=$(debsig-verify $1 | grep -Eo 'Verified')
+                        if [[ $verify_deb == "Verified" ]]; then
+                            echo -e "${GREEN}Signature Verified.${NC}" 2>&1 | tee -a $logfile
+                        else
+                            echo -e "${RED}ERR: Unable to verify signature.${NC}" 2>&1 | tee -a $logfile
+                            abort
+                        fi
+                    fi
+                fi
+            fi
+        ;;    
+    esac
+    echo -e "${GREEN}[1/8]Prerequisite Checks Completed.${NC}" 2>&1 | tee -a $logfile
+}
+
+#::::::::::
+# Begin RPM/DEB Installation
+#::::::::::
+Install(){
+    takRPM=$1
+    dir=/opt/tak
+
+# Gather System Information for logging
+    cat /etc/*-release &> $logfile
+
+# Update JVM limits
+    echo -e "${YELLOW}Increasing JVM threads...${NC}"
+    echo -e "\n# Applying JVM Limits.\n" &>> $logfile
+    echo -e "*      soft      nofile      32768\n*      hard      nofile      32768" | tee --append /etc/security/limits.conf > /dev/null
+    echo -e "${GREEN}[2/8]JVM Task Complete.${NC}" 2>&1 | tee -a $logfile
+
+# Install Extra Packages for Linux
+    echo -e "${YELLOW}Installing Extra Packages for Linux...${NC}"
+    echo -e "\n# Installing Extra Packages for Linux.\n" &>> $logfile
+    case $distro in
+        rocky)
+            dnf config-manager --set-enabled powertools 2>&1 | tee -a $logfile && dnf install epel-release -y 2>&1 | tee -a $logfile
+            echo -e "${GREEN}[3/8]EPEL Task Complete.${NC}" 2>&1 | tee -a $logfile
+        ;;
+        rhel)
+            echo -e "${YELLOW}Checking RHEL Subscription Status...${NC}"
+            sStatus=$(subscription-manager status | grep -Eo "Overall Status: .+" | sed 's/^.\{16\}//') && echo -e "$sStatus" &>> $logfile
+            if [ "$sStatus" == "Unknown" ]; then
+                echo -e "${RED}This system is not registered with an entitlement server. You can use subscription-manager to register.${NC}" 2>&1 | tee -a $logfile
+                abort
+            fi
+            subscription-manager repos --enable codeready-builder-for-rhel-8-$(arch)-rpms 2>&1 | tee -a $logfile
+            rpm --import https://dl.fedoraproject.org/pub/epel/RPM-GPG-KEY-EPEL-8 
+            dnf install https://dl.fedoraproject.org/pub/epel/epel-release-latest-8.noarch.rpm -y 2>&1 | tee -a $logfile
+            echo -e "${GREEN}[3/8]EPEL Task Complete.${NC}" 2>&1 | tee -a $logfile
+        ;;
+        ubuntu|debian)
+            echo -e "${GREEN}[3/8]Debian System detected, EPEL Skippped.${NC}" 2>&1 | tee -a $logfile
+        ;;
+    esac
+
+# Install PostgreSQL and PostGIS
+    echo -e "${YELLOW}Installing PostgreSQL and PostGIS...${NC}"
+    echo -e "\n# Installing PostgreSQL and PostGIS.\n" &>> $logfile
+    case $distro in
+        rocky|rhel)
+            rpm --import https://download.postgresql.org/pub/repos/yum/keys/PGDG-RPM-GPG-KEY-RHEL
+            dnf install https://download.postgresql.org/pub/repos/yum/reporpms/EL-8-$(arch)/pgdg-redhat-repo-latest.noarch.rpm -y 2>&1 | tee -a $logfile
+            dnf -qy module disable postgresql &>> $logfile
+            echo -e "${GREEN}[4/8]PostgreSQL and PostGIS Task Complete.${NC}" 2>&1 | tee -a $logfile
+        ;;
+        ubuntu|debian)
+            apt install curl ca-certificates -y 2>&1 | tee -a $logfile
+            install -d /usr/share/postgresql-common/pgdg
+            curl -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc --fail https://www.postgresql.org/media/keys/ACCC4CF8.asc
+            sudo sh -c 'echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list'
+            echo -e "${GREEN}[4/8]PostgreSQL and PostGIS Task Complete.${NC}" 2>&1 | tee -a $logfile
+            apt update -y 2>&1 | tee -a $logfile
+        ;;
+    esac
+
+# Install Java-OpenJDK
+    echo -e "${YELLOW}Installing Java-OpenJDK...${NC}"
+    echo -e "\n# Installing Java-OpenJDK.\n" &>> $logfile
+    case $distro in
+        rocky|rhel)
+            dnf install java-17-openjdk-devel -y 2>&1 | tee -a $logfile
+        ;;
+        ubuntu|debian)
+            apt install openjdk-17-jre -y 2>&1 | tee -a $logfile
+        ;;
+    esac
+    echo -e "${GREEN}[5/8]Java-OpenJDK Task Complete.${NC}" 2>&1 | tee -a $logfile
+
+# Perform TAK Server Installation
+    echo -e "${YELLOW}Installing $takRPM...${NC}"
+    echo -e "\n# Installing $takRPM.\n" &>> $logfile
+    case $distro in
+        rocky|rhel)
+            dnf install $takRPM -y 2>&1 | tee -a $logfile
+        ;;
+        ubuntu|debian)
+            apt install ./$takRPM -y 2>&1 | tee -a $logfile
+        ;;
+    esac
+    echo -e "${GREEN}[6/8]Installation of $takRPM Task Complete.${NC}" 2>&1 | tee -a $logfile
+
+# Configure SELinux
+    echo -e "${YELLOW}Configuring SELinux...${NC}"
+    echo -e "\n# Configuring SELinux.\n" &>> $logfile
+    if [ $distro == "rocky" ]; then 
+        echo -e "\n# [Rocky Linux] Installing checkpolicy.\n" &>> $logfile
+        dnf install checkpolicy -y 2>&1 | tee -a $logfile
+        echo -e "${GREEN}[Rocky Linux] Installation of checkpolicy Task Complete.${NC}" 2>&1 | tee -a $logfile
+    fi
+    if [ $distro == "rocky" ] || [ $distro == "rhel" ]; then
+        cd /opt/tak && ./apply-selinux.sh 2>&1 | tee -a $logfile
+        cd $homeDir
+    fi
+    echo -e "${GREEN}[7/8]Configuring SELinux Task Complete.${NC}" 2>&1 | tee -a $logfile
+
+# Install additional dependencies
+    echo -e "${YELLOW}Install Additional Dependencies...${NC}"
+    echo -e "\n# Installing Additional Dependencies.\n" &>> $logfile    
+    case $distro in
+        rocky|rhel)
+            dnf install dialog zip unzip -y 2>&1 | tee -a $logfile
+        ;;
+        ubuntu|debian)
+            apt install dialog zip unzip -y 2>&1 | tee -a $logfile
+        ;;
+    esac
+    echo -e "${GREEN}[8/8]Dependency Installation Task Complete.${NC}" 2>&1 | tee -a $logfile
+}
+#::::::::::
+# TAK Wizard Text User Interface
+#::::::::::
+splash(){
+    exec 3>&1
+    dialog --backtitle "$backTitle" --title "- TAK Server Setup -" --ok-label "Continue" --msgbox \
+"WELCOME to the TAK Server initial setup script.\n\n"'
+'"This script will guide you through the initial configuration \nneeded to complete your setup of TAK Server.\n\n"'
+'"Navigation around the menu boxes is done using the <arrow keys> or <tab>.\n\n"'
+'"Selecting options in a checklist is best done using the <spacebar>.\n\n"'
+'"Hit enter to continue." 0 0
+    exec 3>&-
+}
+
+# Certificate Properties
+set-certproperties(){
+    Country=${certconfig[0]}
+    State=${certconfig[1]}
+    City=${certconfig[2]}
+    Organization=${certconfig[3]}
+    Organizational_Unit=${certconfig[4]}
+    oldIFS="$IFS"
+    IFS=$'\n'
+    exec 3>&1
+    certconfig=($(dialog --clear --ok-label "Submit" --no-cancel --backtitle "$backTitle" --title "TAK Server PKI Configuration" \
+    --form "The following values are required for the self-signed certificate signing request.  The information will be used to identify the certificate via its Distinguished Name or DN."'
+    '"\n\nSet the following options for your certificate request."'
+    '"\n\nUse the UP and DOWN Arrow Keys to navigate; TAB to SUBMIT." 0 0 0 \
+    "Country:" 1 1 "$Country" 1 20 30 0 \
+    "State:" 2 1 "$State" 2 20 30 0 \
+    "City:" 3 1 "$City" 3 20 30 0 \
+    "Organization:" 4 1 "$Organization" 4 20 30 0 \
+    "Oranizational Unit:" 5 1 "$Organizational_Unit" 5 20 30 0 \
+    2>&1 1>&3))        
+    exec 3>&-
+}
+apply-certproperties(){
+    echo -e "${YELLOW}Applying Certificate Properties...${NC}"
+    echo -e "\n# Applying Certificate Properties.\n" &>> $logfile
+    certCountry=$(awk -F'=' '/^COUNTRY=/ { print $2 }' $dir/certs/cert-metadata.sh | tr -d '"')
+    certState=$(awk -F'=' '/^STATE=/ { print $2 }' $dir/certs/cert-metadata.sh | tr -d '"')
+    certCity=$(awk -F'=' '/^CITY=/ { print $2 }' $dir/certs/cert-metadata.sh | tr -d '"')
+    certOrg=$(awk -F'=' '/^ORGANIZATION=/ { print $2 }' $dir/certs/cert-metadata.sh | tr -d '"')
+    certOrgUnit=$(awk -F'=' '/^ORGANIZATIONAL_UNIT=/ { print $2 }' $dir/certs/cert-metadata.sh | tr -d '"')
+
+    sed -i 8,15s/$certCountry/"'"${certconfig[0]}"'"/g $dir/certs/cert-metadata.sh
+    sed -i 8,15s/$certState/"'"${certconfig[1]}"'"/g $dir/certs/cert-metadata.sh
+    sed -i 8,15s/$certCity/"'"${certconfig[2]}"'"/g $dir/certs/cert-metadata.sh
+    sed -i 8,15s/$certOrg/"'"${certconfig[3]}"'"/g $dir/certs/cert-metadata.sh
+    sed -i 8,15s/$certOrgUnit/"'"${certconfig[4]}"'"/g $dir/certs/cert-metadata.sh
+    echo -e "${GREEN}[1/7]Applying Certificate Properties Task Complete.${NC}" 2>&1 | tee -a $logfile
+}
+# Certificate Password
+set-certauthpass() {
+    exec 3>&1
+# Prompt to chanage the default certificate password
+    dialog --backtitle "$backTitle" --title "TAK Server PKI Configuration" --defaultno \
+        --yesno "By default the certificate password is 'atakatak'."' 
+'"\n\nwould you like to change it?" 0 0 \
+        2>&1 1>&3
+# Exit status
+    certpasswd=$?
+    if [ $certpasswd = 0 ]; then
+        CAPASSWD=$CAPASSWD
+        CAPASSWD=($(dialog --clear --no-cancel --backtitle "$backTitle" \
+            --title "TAK Server PKI Configuration" \
+            --inputbox "Enter new certificate password:" \
+            0 0 \
+            2>&1 1>&3))
+# Exit status
+        caResponse=$?
+    else
+        CAPASSWD=atakatak
+    fi
+    exec 3>&-
+}
+apply-certauthpass() {
+    if [[ $caResponse = 0 ]]; then
+        echo -e "${YELLOW}Applying Certificate Password...${NC}"
+        echo -e "\n# Applying Certificate Password.\n" &>> $logfile
+        sed -i s/atakatak/$CAPASSWD/g $dir/certs/cert-metadata.sh
+        sed -i s/atakatak/$CAPASSWD/g $exampleconfigxml
+        echo -e "${GREEN}Applying Certificate Password Task Complete.${NC}" &>> $logfile
+    else
+        echo -e "${YELLOW}Certificate Password Unchanged...${NC}" &>> $logfile
+        echo -e "\n# Certificate Password Unchanged.\n" &>> $logfile
+        CAPASSWD=atakatak
+    fi
+}
+# Public/Private Key Infrastructure
+set-certauthname() {
+    rootCA="${rootCA}"
+    intCA="${intCA}"
+    exec 3>&1
+# Prompt for Root Certificate Authority Name
+    rootCA="$(dialog --clear --no-cancel --backtitle "$backTitle" \
+        --title "TAK Server PKI Configuration" \
+        --inputbox "The Root Certificate Authority is the first certificate in the PKI environment.  It will be used to sign the issuing CA next."'
+'"\n\nEnter a name for the Root CA:" 0 0 \
+        2>&1 1>&3)"
+
+    if [[ $rootCA = "" ]]; then
+        rootCA="$(date +%s%N | sha256sum | base64 | head -c 12)-ROOT-CA-01"
+    else
+# Convert spaces to dash
+        rootCA="${rootCA// /-}"
+# Change case to Upper
+        rootCA=$(echo "$rootCA" | tr [a-z] [A-Z])
+    fi
+# Prompt for Intermediate Certificate Authority Name
+    intCA="$(dialog --clear --no-cancel --backtitle "$backTitle" \
+        --title "TAK Server PKI Configuration" \
+        --inputbox "The Intermediate CA will act as the Issing CA for all certificates on the behalf of the Root CA."'
+'"\n\nEnter a name for the Intermediate CA:" 0 0 \
+        2>&1 1>&3)"
+    if [[ $intCA = "" ]]; then
+        intCA="$(date +%s%N | sha256sum | base64 | head -c 12)-CA-01"
+    else
+# Convert spaces to dash
+        intCA="${intCA// /-}"
+# Change case to Upper
+        intCA=$(echo "$intCA" | tr [a-z] [A-Z])
+    fi
+    exec 3>&-
+}
+apply-certauthname() {
+    echo -e "${YELLOW}Creating Root Certificate Authority ${rootCA}...${NC}"
+    echo -e "\n# Creating Root Certificate Authority ${rootCA}.\n" &>> $logfile
+# Create new RootCA
+    cd $dir/certs || exit
+    if [[ $@ = *-fips* ]]; then
+        $makerootca --ca-name "$rootCA" --fips
+    else
+        $makerootca --ca-name "$rootCA"
+    fi
+    echo -e "${GREEN}[2/7]Creating Root Certificate Authority ${rootCA} Task Complete.${NC}" 2>&1 | tee -a $logfile
+# Create Intermediate CA
+    echo -e "${YELLOW}Creating Intermediate/Issuing Certificate Authority ${intCA}...${NC}"
+    echo -e "\n# Creating Intermediate/Issuing Certificate Authority ${intCA}.\n" &>> $logfile
+    if [[ $@ = *-fips* ]]; then
+        echo y | $makeCert ca "$intCA" --fips
+    else
+        echo y | $makeCert ca "$intCA"
+    fi
+    echo -e "${GREEN}[3/7]Creating Intermediate/Issuing Certificate Authority ${intCA} Task Complete.${NC}" 2>&1 | tee -a $logfile
+    echo -e "${YELLOW}Updating the CoreConfiguration Files...${NC}"
+    echo -e "\n# Updating the CoreConfiguration Files.\n" &>> $logfile
+# Update the CoreConfig.example.xml for the truststore
+    sed -i "s/truststore-root/truststore-$intCA/g" $exampleconfigxml
+# Update the CoreConfig.example.xml for the CRL
+    crl=$"\    \n    <crl _name=\"TAKServer CA\" crlFile=\"certs/files/${intCA}.crl\"/>"
+# Append CRL
+    sed -i "118i $crl" $exampleconfigxml
+    echo -e "${GREEN}[4/7]Updating the CoreConfiguration Files Task Complete.${NC}" 2>&1 | tee -a $logfile
+# Create new TAK Server Certificate
+    echo -e "${YELLOW}Creating the Client Certificate for ${HOSTNAME}...${NC}"
+    echo -e "\n# Creating the Client Certificate for ${HOSTNAME}.\n" &>> $logfile
+    if [[ $@ = *-fips* ]]; then
+        $makeCert server ${HOSTNAME} --fips
+    else
+        $makeCert server ${HOSTNAME}
+    fi
+    sed -i "s/takserver.jks/${HOSTNAME}.jks/g" $exampleconfigxml
+    echo -e "${GREEN}[5/7]Creating the Client Certificate for ${HOSTNAME} Task Complete.${NC}" 2>&1 | tee -a $logfile
+}
+# Certificate Enrollment Configuration
+set-certautoenroll() {
+    exec 3>&1
+    dialog --backtitle "$backTitle" \
+        --title "Certificate Auto-Enrollment Configuration" \
+        --yesno "Certificate Auto-Enrollemnt enables the client to request a certificate from the TAK Server without the need to pass soft certificates to the TAK Clients."'
+    '"\n\nDo you want to enable Certificate Auto-Enrollement?" 0 0 \
+        2>&1 1>&3
+    # Exit Status
+    certAEnrollment=$?
+    exec 3>&-
+}
+apply-certautoenroll() {
+    if [ $certAEnrollment = 0 ]; then
+        echo -e "${YELLOW}Applying Certificate Auto Enrollment Configuration...${NC}"
+        echo -e "\n# Applying Certificate Auto Enrollment Configuration.\n" &>> $logfile
+        CertificateAutoEnrollment=$"\    \n<certificateSigning CA=\"TAKServer\">\n	<certificateConfig>\n		<nameEntries>\n			<nameEntry name=\"O\" value=\"${certconfig[3]}\"\/>\n			<nameEntry name=\"OU\" value=\"${certconfig[4]}\"\/>\n		</nameEntries>\n	</certificateConfig>\n	    <TAKServerCAConfig keystore=\"JKS\" keystoreFile=\"certs/files/${intCA}-signing.jks\" keystorePass=\"${CAPASSWD}\" validityDays=\"30\" signatureAlg=\"SHA256WithRSA\" CAkey=\"/opt/tak/certs/files/${intCA}\" CAcertificate=\"/opt/tak/certs/files/${intCA}\" \/>\n    </certificateSigning>"
+        sed -i "112i $CertificateAutoEnrollment" $exampleconfigxml
+        sed -i 's/<auth>/<auth x509groups="true" x509groupsDefaultRDN="true" x509addAnonymous="false" x509useGroupCache="true" x509checkRevocation="true">/g' $exampleconfigxml
+        case $distro in
+            rocky|rhel)
+                firewall-cmd --zone=public --add-port 8446/tcp --permanent >/dev/null
+                firewall-cmd --reload >/dev/null
+            ;;
+            ubuntu|debian)
+                apt install ufw -y 2>&1 | tee -a $logfile
+                # Initial Firewall Rules
+                ufw default deny incoming
+                ufw default allow outgoing
+                ufw allow ssh
+                ufw allow 8446 >/dev/null
+            ;;
+        esac
+        echo -e "${GREEN}[6/7]Applying Certificate Auto Enrollment Configuration Task Complete.${NC}" 2>&1 | tee -a $logfile
+    else
+        echo -e "${GREEN}[6/7]SKIP Certificate Auto Enrollment Configuration Task.${NC}" 2>&1 | tee -a $logfile
+    fi
+}
+# TAK Federation Configuration
+set-takfederation() {
+    exec 3>&1
+    dialog --backtitle "$backTitle" \
+        --title "Federation Configuration" \
+        --yesno "Federation allows TAK clients connected to the TAK Server to share data across different connected networks.\n\n"'
+'"Federation requires the exchanging of the TAK Server CAs to establish a secure server to server connection for sharing information."'
+'"\n\nDo you want to enable TAK Server Federation v2?" 0 0 \
+        2>&1 1>&3
+    serverFederation=$?
+    exec 3>&-
+}
+apply-takfederation() {
+    if [ $serverFederation = 0 ]; then
+        echo -e "${YELLOW}Applying TAK Server Federation Configuration...${NC}"
+        echo -e "\n# Applying TAK Server Federation Configuration.\n" &>> $logfile
+        fedEnabled=$"\    \n<federation allowFederatedDelete=\"false\" allowMissionFederation=\"true\" allowDataFeedFederation=\"true\" enableMissionFederationDisruptionTolerance=\"true\" missionFederationDisruptionToleranceRecencySeconds=\"43200\" enableFederation=\"true\" federatedGroupMapping=\"true\" automaticGroupMapping=\"false\" enableDataPackageAndMissionFileFilter=\"false\">\n      <federation-server port=\"9000\" coreVersion=\"2\" v1enabled=\"false\" v2port=\"9001\" v2enabled=\"true\">\n        <tls context=\"TLSv1.2\" keymanager=\"SunX509\" keystore=\"JKS\" keystoreFile=\"certs/files/${HOSTNAME}.jks\" keystorePass=\"${CAPASSWD}\" truststore=\"JKS\" truststoreFile=\"certs/files/fed-truststore.jks\" truststorePass=\"${CAPASSWD}\"/>\n		    <federation-port port=\"9000\" tlsVersion=\"TLSv1.2\"/>\n            <v1Tls tlsVersion=\"TLSv1.2\"/>\n            <v1Tls tlsVersion=\"TLSv1.3\"/>\n      </federation-server>\n	    <fileFilter>\n            <fileExtension>pref</fileExtension>\n        </fileFilter>\n    </federation>"
+        if [ $certAEnrollment = 0 ]; then
+            sed -i "144i $fedEnabled" $exampleconfigxml
+            sed -i '157,164d' $exampleconfigxml
+        else
+            sed -i "134i $fedEnabled" $exampleconfigxml
+            sed -i '147,154d' $exampleconfigxml
+            sed -i 's/<auth>/<auth x509groups="true" x509groupsDefaultRDN="true" x509addAnonymous="false">/g' $exampleconfigxml
+        fi
+        case $distro in
+            rocky|rhel)
+                firewall-cmd --zone=public --add-port 9001/tcp --permanent >/dev/null
+                firewall-cmd --reload >/dev/null
+            ;;
+            ubuntu|debian)
+                ufw allow 9001 >/dev/null
+            ;;
+        esac
+        echo -e "${GREEN}[7/7]Applying TAK Server Federation Configuration Task Complete.${NC}" 2>&1 | tee -a $logfile
+    else
+        echo -e "${GREEN}[7/7]SKIP TAK Server Federation Configuration Task.${NC}" 2>&1 | tee -a $logfile
+    fi
+}
+# Display the Review Changes Screen
+finalize-install() {
+    exec 3>&1
+    if [ $certAEnrollment = 0 ]; then
+        enrollmentState="Enabled"
+    else
+        enrollmentState="Disabled"
+    fi
+    if [ $serverFederation = 0 ]; then
+        federationState="Enabled"
+    else
+        federationState="Disabled"
+    fi
+
+    dialog --backtitle "$backTitle" --title "Configuration Summary" --scrollbar --defaultno --yes-label "Confirm" --no-label "Reset Wizard" --yesno \
+        "The TAK Server will be initialized with the following configuration:\n"'
+    '"\nCertificate Information\n"'
+    '"Country: ${certconfig[0]}\n"'
+    '"State: ${certconfig[1]}\n"'
+    '"City: ${certconfig[2]}\n"'
+    '"Organization: ${certconfig[3]}\n"'
+    '"Organizational_Unit: ${certconfig[4]}\n"'
+    '"Certificate Password: $CAPASSWD\n"'
+    '"Root CA Name: $rootCA\n"'
+    '"Intermediate/Subordinate CA Name: $intCA\n"'
+    '"\nOptional Configuration Settings\n"'
+    '"Certificate Enrollment: $enrollmentState\n"'
+    '"Federation: $federationState\n"'
+    '"FIPS: $fips\n"'
+    '"\nSelect Confirm to continue.  Reset to Restart the Config Wizard." 0 0 2>&1 1>&3
+    return=$?
+    if [ $return = 1 ]; then
+        takWizard
+    else
+        executeConfiguration
+    fi
+    exec 3>&-
+}
+
+enableFQDN(){
+    LEdir="/etc/letsencrypt"
+        echo -e "${YELLOW}Installing CertBot...${NC}"
+        echo -e "\n# Installing CertBot.\n" &>> $logfile
+    case $distro in
+        rocky|rhel)
+            dnf install certbot -y 2>&1 | tee -a $logfile
+            firewall-cmd --zone=public --add-port 80/tcp --permanent >/dev/null
+            firewall-cmd --reload >/dev/null
+        ;;
+        ubuntu|debian)
+            apt-get install certbot -y 2>&1 | tee -a $logfile
+            ufw allow 80 >/dev/null
+        ;;
+    esac
+    echo -e "${GREEN}Installation of CertBot Task Complete.${NC}" 2>&1 | tee -a $logfile
+
+    exec 3>&1
+    dialog --backtitle "$backTitle" --title "- Lets Encrypt Certificate -" --ok-label "Continue" --msgbox \
+"Before continuing ensure that TCP port 80 is allowed into your network.\n\n"'
+'"This is either done through port-forwarding via your router or adding it to the network firewall for cloud based deployments.\n\n"'
+'"Hit enter to continue." 0 0
+    exec 3>&-    
+
+    FQDNURL=${certREQ[0]}
+    ACMEeMail=${certREQ[1]}
+
+    oldIFS="$IFS"
+    IFS=$'\n'
+    exec 3>&1
+    certREQ=($(dialog --clear --ok-label "Submit" --no-cancel --title "Lets Encrypt Certificate Request" \
+    --form "The following values are required for the public signing certificate signing request.  The information will be used to identify the certificate via its Fully Qualified Domain Name (FQDN)."'
+    '"\n\nUse the UP and DOWN Arrow Keys to navigate; TAB to SUBMIT." 0 0 0 \
+    "Server FQDN URL:" 1 1 "$FQDNURL" 1 20 30 0 \
+    "E-Mail for ACME CA Registration:" 2 1 "$ACMEeMail" 2 20 30 0 \
+    2>&1 1>&3))
+
+    dialog --backtitle "$backTitle" --title "Let's Encrypt Configuration Summary" --scrollbar --defaultno --yes-label "Confirm" --no-label "Reset Wizard" --yesno \
+        "The TAK Server will be initialized with the following configuration:\n"'
+    '"\nCertificate Information\n"'
+    '"Server FQDN URL: ${certREQ[0]}\n"'
+    '"E-Mail for ACME CA Registration: ${certREQ[1]}\n"'
+    '"\nSelect Confirm to continue.  Reset to Restart the Config Wizard." 0 0 2>&1 1>&3
+    return=$?
+    if [ $return = 1 ]; then
+        enableFQDN
+    else
+        set-LEFQDN
+    fi
+    exec 3>&-
+    IFS="$oldIFS"
+}
+set-LEFQDN(){
+    echo -e "${YELLOW}Requesting public certificate for: ${certREQ[0]}...${NC}"
+    echo -e "\n# Requesting public certificate for: ${certREQ[0]}.\n" &>> $logfile
+    certbot certonly -d ${certREQ[0]} -m ${certREQ[1]} --standalone --agree-tos --no-eff-email
+        case $type in
+            OS)
+                openssl pkcs12 -export -in $LEdir/live/${certREQ[0]}/fullchain.pem -inkey $LEdir/live/${certREQ[0]}/privkey.pem -out $certs/${HOSTNAME}-le.p12 -name ${certREQ[0]} -passin pass:${CAPASSWD} -passout pass:${CAPASSWD}
+                keytool -importkeystore -destkeystore $certs/${HOSTNAME}-le.jks -srckeystore $certs/${HOSTNAME}-le.p12 -srcstoretype pkcs12 -deststorepass "${CAPASSWD}" -destkeypass "${CAPASSWD}" -srcstorepass "${CAPASSWD}"
+                sed -i "s#connector port=\"8446\" clientAuth=\"false\" _name=\"cert_https\"#connector port=\"8446\" clientAuth=\"false\" _name=\"cert_https_LE\"  keystore=\"JKS\" keystoreFile=\"certs/files/${HOSTNAME}-le.jks\" keystorePass=\"${CAPASSWD}\"#g" $configxml
+                sed -i "s#connector port=\"8446\" clientAuth=\"false\" _name=\"cert_https\"#connector port=\"8446\" clientAuth=\"false\" _name=\"cert_https_LE\"  keystore=\"JKS\" keystoreFile=\"certs/files/${HOSTNAME}-le.jks\" keystorePass=\"${CAPASSWD}\"#g" $exampleconfigxml
+                echo -e "${GREEN}Requesting public certificate for: ${certREQ[0]} Task Complete.${NC}" 2>&1 | tee -a $logfile
+                # Create auto-renew script
+                SLEEPTIME=$(awk 'BEGIN{srand(); print int(rand()*(3600+1))}'); echo "0 0,12 * * * root sleep $SLEEPTIME && certbot renew -q && /opt/tak/renew-tak-le" | sudo tee -a /etc/crontab > /dev/null
+                tee /etc/cron.d/certbot-tak-le >/dev/null <<EOF
+SHELL=/bin/sh
+PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
+0 */12 * * * root certbot -q renew && /opt/tak/renew-tak-le
+EOF
+                chmod 644 /etc/cron.d/certbot-tak-le
+                systemctl restart crond.service
+                tee $dir/renew-tak-le >/dev/null <<EOF
+#!/bin/bash
+openssl pkcs12 -export -in $LEdir/live/${certREQ[0]}/fullchain.pem -inkey $LEdir/live/${certREQ[0]}/privkey.pem -out $certs/${HOSTNAME}-le.p12 -name ${certREQ[0]} -passin pass:${CAPASSWD} -passout pass:${CAPASSWD}
+keytool -importkeystore -destkeystore $certs/${HOSTNAME}-le.jks -srckeystore $certs/${HOSTNAME}-le.p12 -srcstoretype pkcs12 -deststorepass "${CAPASSWD}" -destkeypass "${CAPASSWD}" -srcstorepass "${CAPASSWD}"
+chown -R tak:tak $dir
+systemctl restart takserver.service && ( tail -f -n0 $dir/logs/takserver-messaging.log & ) | grep -q "Started TAK Server messaging Microservice"
+EOF
+                chmod +x $dir/renew-tak-le
+                chown -R tak:tak $dir
+                echo -e "\n# Restarting TAK Server to apply new configurations.\n" &>> $logfile
+                echo -e "${YELLOW}Please Wait...${NC}"
+                systemctl restart takserver.service && ( tail -f -n0 $dir/logs/takserver-messaging.log & ) | grep -q "Started TAK Server messaging Microservice"
+            ;;
+            Container)
+                Ccerts=/opt/tak/certs/files/
+                docker cp -L $LEdir/live/${certREQ[0]}/fullchain.pem takserver:$Ccerts
+                docker cp -L $LEdir/live/${certREQ[0]}/privkey.pem takserver:$Ccerts
+                docker exec takserver bash -c "openssl pkcs12 -export -in $Ccerts/fullchain.pem -inkey $Ccerts/privkey.pem -out $Ccerts/${HOSTNAME}-le.p12 -name ${certREQ[0]} -passin pass:${CAPASSWD} -passout pass:${CAPASSWD}"
+                docker exec takserver bash -c "keytool -importkeystore -destkeystore $Ccerts/${HOSTNAME}-le.jks -srckeystore $Ccerts/${HOSTNAME}-le.p12 -srcstoretype pkcs12 -deststorepass "${CAPASSWD}" -destkeypass "${CAPASSWD}" -srcstorepass "${CAPASSWD}""
+                sed -i "s#connector port=\"8446\" clientAuth=\"false\" _name=\"cert_https\"#connector port=\"8446\" clientAuth=\"false\" _name=\"cert_https_LE\"  keystore=\"JKS\" keystoreFile=\"certs/files/${HOSTNAME}-le.jks\" keystorePass=\"${CAPASSWD}\"#g" $configxml
+                sed -i "s#connector port=\"8446\" clientAuth=\"false\" _name=\"cert_https\"#connector port=\"8446\" clientAuth=\"false\" _name=\"cert_https_LE\"  keystore=\"JKS\" keystoreFile=\"certs/files/${HOSTNAME}-le.jks\" keystorePass=\"${CAPASSWD}\"#g" $exampleconfigxml
+            ;;
+        esac
+    echo -e "${GREEN}Let's Encrypt Certificate Successfully applied.${NC}" 2>&1 | tee -a $logfile
+    echo -e "${GREEN}Let's Encrypt Certificate Task Complete.${NC}"
+}
+
+# Establish the DataPackage/Enrollment Process
+create-datapackage() {
+# Create temp dir
+    mkdir /tmp/enrollmentDP
+    cd /tmp/enrollmentDP || exit
+    UUID=$(uuidgen -r)
+    IFS=$'\n'
+    serverIP=$(ip addr show $(ip route | awk '/default/ { print $5 }') | grep "inet" | head -n 1 | awk '/inet/ {print $2}' | cut -d'/' -f1)
+    exec 3>&1
+
+    serverDesc="${HOSTNAME}"
+    serverDesc=($(dialog --clear --no-cancel --backtitle "$backTitle" --title "TAK Server Description" --ok-label "Create DataPackage" \
+        --inputbox "Enter a short description of this TAK Server connection to be displayed on the TAK Client." \
+        0 0 "TAK Server" 2>&1 1>&3))
+    dialog --backtitle "$backTitle" --title "Configure FQDN" --defaultno --yesno "Does this TAK Server support FQDN connections?" 0 0 2>&1 1>&3
+# Exit Status
+    setFQDN=$?
+# Set FQDN YES
+    if [ $setFQDN = 0 ]; then
+        dialog --backtitle "$backTitle" --title "Configure FQDN" --defaultno --no-label Local --yes-label Lets-Encrypt \
+        --yesno "How will this server be trusted?\n\n"'
+'"Local: Use this option if your using an internal DNS and will setup your own trust anchor.\n\n"'
+'"Let's Encrypt: This will request a public certificate from Let's Encrypt and configure the server appropriately.\n\n"'
+'"Select the appropriate FQDN configuration for your environment." \
+        0 0 2>&1 1>&3
+        # Exit Status
+        optFQDN=$?
+        # FQDN YES
+        if [ $optFQDN = 0 ]; then
+            enableFQDN
+        else
+            serverEndPoint=($(dialog --clear --no-cancel --backtitle "$backTitle" --title "TAK Server Fully Qualified Domain Name (FQDN) Connection" --ok-label "Create DataPackage" \
+                --inputbox "Enter the FQDN of this TAK Server connection; otherwise, enter the TAK Server Public IP Address." \
+                0 0 "$serverIP" 2>&1 1>&3))
+        fi
+    else
+        serverEndPoint=$serverIP
+    fi
+    exec 3>&-
+
+# config.cnf
+        tee config.pref >/dev/null <<EOF
+<?xml version='1.0' encoding='ASCII' standalone='yes'?>
+<preferences>
+<preference version="1" name="cot_streams">
+    <entry key="count" class="class java.lang.Integer">1</entry>
+    <entry key="description0" class="class java.lang.String">$serverDesc</entry>
+    <entry key="enabled0" class="class java.lang.Boolean">true</entry>
+    <entry key="connectString0" class="class java.lang.String">$serverEndPoint:8089:ssl</entry>
+    <entry key="caLocation0" class="class java.lang.String">cert/caCert.p12</entry>
+    <entry key="caPassword0" class="class java.lang.String">$CAPASSWD</entry>
+    <entry key="enrollForCertificateWithTrust0" class="class java.lang.Boolean">true</entry>
+    <entry key="useAuth0" class="class java.lang.Boolean">true</entry>
+    <entry key="cacheCreds0" class="class java.lang.String">Cache credentials</entry>
+</preference>
+<preference version="1" name="com.atakmap.app_preferences">
+    <entry key="displayServerConnectionWidget" class="class java.lang.Boolean">true</entry>
+    <entry key="locationTeam" class="class java.lang.String">Blue</entry>
+    <entry key="atakRoleType" class="class java.lang.String">Team Member</entry>
+</preference>
+</preferences>
+EOF
+
+# MANIFEST.xml
+    tee MANIFEST.xml >/dev/null <<EOF
+<MissionPackageManifest version="2">
+<Configuration>
+    <Parameter name="uid" value="$UUID"/>
+    <Parameter name="name" value="enrollmentDP.zip"/>
+    <Parameter name="onReceiveDelete" value="true"/>
+</Configuration>
+<Contents>
+    <Content ignore="false" zipEntry="config.pref"/>
+    <Content ignore="false" zipEntry="caCert.p12"/>
+</Contents>
+</MissionPackageManifest>
+EOF
+    echo $serverDesc > $dir/takdatapackagedesc
+    echo $serverEndPoint >> $dir/takdatapackagedesc
+    cp $certs/truststore-$intCA.p12 /tmp/enrollmentDP/caCert.p12
+
+    zip -j $homeDir/enrollmentDP.zip /tmp/enrollmentDP/*
+    chown -R "$curuser":"$curuser" $homeDir
+    cd /tmp
+    rm -Rf enrollmentDP
+    IFS="$oldIFS"
+}
+create-webadmin(){
+    echo -e "${YELLOW}Creating Admin Certificate...${NC}"
+    echo -e "\n# Creating Admin Certificate.\n" &>> $logfile
+    cd $dir/certs || exit
+    if [[ $@ = *-fips* ]]; then
+        echo y | $makeCert client webadmin --fips
+    else
+        echo y | $makeCert client webadmin
+    fi
+    java -jar $dir/utils/UserManager.jar certmod -A $certs/webadmin.pem
+    cp $certs/webadmin.p12 $homeDir/
+    chown -R "$curuser":"$curuser" $homeDir
+    chown -R tak:tak $dir
+    echo -e "${GREEN}Creating Admin Certificate Task Complete.${NC}" 2>&1 | tee -a $logfile
+}
+
+# Establish the Wizard Workflow
+takWizard(){
+    # RPM/DEB Global Variables
+    javaconf="/usr/lib/jvm/java-17-openjdk-*"
+    javasecurity=$javaconf/conf/security/java.security
+    certs=$dir/certs/files
+    configxml=$dir/CoreConfig.xml
+    exampleconfigxml=$dir/CoreConfig.example.xml
+    makerootca=$dir/certs/makeRootCa.sh
+    makeCert=$dir/certs/makeCert.sh        
+    splash
+    set-certproperties
+    set-certauthpass
+    set-certauthname
+    set-certautoenroll
+    set-takfederation
+    finalize-install
+}
+# Establish the Execution Workflow
+executeConfiguration(){
+    clear
+    case $type in
+        OS)
+            apply-certproperties
+            apply-certauthpass
+            apply-certauthname
+            apply-certautoenroll
+            apply-takfederation
+            echo -e "${YELLOW}Configuring TAK Server for first run.${NC}"
+            echo -e "\n# Configuring TAK Server for first run.\n" &>> $logfile
+            touch $dir/logs/takserver-messaging.log
+            chown -R tak:tak $dir
+            if [ -f "/etc/apt/sources.list.d/raspi.list" ]; then
+                # Raspberry Pi OS
+                echo -e "${YELLOW}[Raspberry Pi OS]Performing additional tasks for optimized performance.${NC}"
+                echo -e "\n# [Raspberry Pi OS]Performing additional tasks for optimized performance.\n" &>> $logfile
+                # Source https://github.com/talentedbrute/tak-server-systemd
+                cd $BASEDIR/tak-server-systemd
+                sh install.sh
+                echo -e "${YELLOW}Please Wait...${NC}"
+                echo -e "\n# [Raspberry Pi OS]This could take up to 1-3 Minutes to complete.\n" &>> $logfile
+                systemctl start takserver-config
+                systemctl start takserver-messaging
+                systemctl start takserver-api
+                # Loop until the new CoreConfig.xml is created
+                while [ ! -f "$configxml" ]; do
+                    # Sleep until the file is created
+                    sleep 5
+                done
+                # Sleep extra due to performance
+                sleep 15
+            else
+                echo -e "${YELLOW}Please Wait...${NC}"
+                systemctl enable takserver && systemctl start takserver.service
+                status=$(systemctl is-active takserver) && echo -e "$status" &>> $logfile
+                # Sleep to create takserver-messaging.log
+                sleep 15
+                if [ $status == "active" ]; then
+                # Loop until the new CoreConfig.xml is created
+                    while [ ! -f "$configxml" ]; do
+                # Sleep until the file is created
+                        sleep 5
+                    done
+                fi
+            fi
+            ( tail -f -n0 $dir/logs/takserver-messaging.log & ) | grep -q "Started TAK Server messaging Microservice"
+            echo -e "${GREEN}TAK Server service STARTED.${NC}" 2>&1 | tee -a $logfile
+        # Create DataPackage
+            if [ $certAEnrollment = 0 ]; then
+                echo -e "${YELLOW}Creating Enrollment Datapackage.${NC}"
+                echo -e "\n# Creating Enrollment Datapackage.\n" &>> $logfile
+                create-datapackage
+            else
+        # Copy the Issuing CA
+                echo -e "${YELLOW}Moving TAK Server Public Certificate.${NC}"
+                echo -e "\n# Moving TAK Server Public Certificate.\n" &>> $logfile
+                cp $certs/truststore-$intCA.p12 $homeDir/caCert.p12
+                chown -R "$curuser":"$curuser" $homeDir
+            fi
+        # Create Webadmin Certificate
+            create-webadmin
+            case $distro in
+                rocky|rhel)
+                    # Add the default firewall ports
+                    firewall-cmd --zone=public --add-port 8089/tcp --add-port 8443/tcp --permanent >/dev/null
+                    firewall-cmd --reload >/dev/null
+                ;;
+                ubuntu|debian)
+                    ufw allow 8089 >/dev/null
+                    ufw allow 8443 >/dev/null
+                ;;
+            esac
+            clear
+            if [ $certAEnrollment = 0 ]; then
+                echo -e "${GREEN}Datapackage for $serverDesc copied to $homeDir/enrollmentDP.zip${NC}" 2>&1 | tee -a $logfile
+            else
+                echo -e "${GREEN}TAK Server Public Certificate copied to $homeDir/caCert.p12${NC}" 2>&1 | tee -a $logfile
+            fi
+            echo -e "${GREEN}Web Admin Certificate copied to $homeDir/webadmin.p12${NC}" 2>&1 | tee -a $logfile
+            echo -e "${GREEN}Initialization Complete.${NC}"
+            ;;
+        Container)
+            apply-certproperties
+            apply-certauthpass
+            echo -e "${YELLOW}Building Containers...${NC}" 2>&1 | tee -a $logfile
+            takDBpass=$(openssl rand -base64 14 | tr -dc 'a-zA-Z0-9')
+            sed -i "s/password=\"\"/password=\"${takDBpass}\"/g" $exampleconfigxml            
+            docker build -t takserver_db -f docker/Dockerfile.takserver-db . 2>&1 | tee -a $logfile
+            docker build -t takserver -f docker/Dockerfile.takserver . 2>&1 | tee -a $logfile
+            echo -e "${GREEN}Containers successfully deployed.${NC}" 2>&1 | tee -a $logfile
+            docker run --mount source=$takDB,destination=/var/lib/postgresql -v $dir:/opt/tak:z -it -p 5432:5432 --network $dockerNet --network-alias tak-database --name takserver-db -d takserver_db
+            cd $homeDir
+            cd "${dockerTAK%????}"
+            docker run -it -v $dir:/opt/tak:z --network $dockerNet --name takserver -d takserver
+            echo -e "${YELLOW}Configuring TAK Server for first run.${NC}"
+            echo -e "${YELLOW}Please Wait...${NC}"
+            sleep 10
+            if [[ $@ = *-fips* ]]; then
+                docker exec takserver bash -c "cd /opt/tak/certs && ./makeRootCa.sh --ca-name $rootCA --fips"
+            else
+                docker exec takserver bash -c "cd /opt/tak/certs && ./makeRootCa.sh --ca-name $rootCA"
+            fi
+            echo -e "${GREEN}[2/7]Creating Root Certificate Authority ${rootCA} Task Complete.${NC}" 2>&1 | tee -a $logfile
+            if [[ $@ = *-fips* ]]; then
+                docker exec takserver bash -c "cd /opt/tak/certs && echo y |./makeCert.sh ca $intCA --fips"
+            else
+                docker exec takserver bash -c "cd /opt/tak/certs && echo y |./makeCert.sh ca $intCA"
+            fi
+            echo -e "${GREEN}[3/7]Creating Intermediate/Issuing Certificate Authority ${intCA} Task Complete.${NC}" 2>&1 | tee -a $logfile
+            
+            sed -i "s/truststore-root/truststore-$intCA/g" $dir/CoreConfig.xml
+            echo -e "${GREEN}[4/7]Updating the CoreConfiguration Files Task Complete.${NC}" 2>&1 | tee -a $logfile
+            if [[ $@ = *-fips* ]]; then
+                docker exec takserver bash -c "cd /opt/tak/certs && ./makeCert.sh server ${HOSTNAME} --fips"
+            else
+                docker exec takserver bash -c "cd /opt/tak/certs && ./makeCert.sh server ${HOSTNAME}"
+            fi
+            sed -i "s/takserver.jks/${HOSTNAME}.jks/g" $exampleconfigxml
+            echo -e "${GREEN}[5/7]Creating the Client Certificate for ${HOSTNAME} Task Complete.${NC}" 2>&1 | tee -a $logfile
+            docker rm -f takserver
+            IFS="$oldIFS"
+            hostPort[0]='-p 8089:8089 -p 8443:8443'
+            if [ $certAEnrollment = 0 ]; then
+                hostPort[1]='-p 8446:8446'
+                echo -e "${GREEN}[6/7]Applying Certificate Auto Enrollment Configuration Task Complete.${NC}" 2>&1 | tee -a $logfile
+            else
+                # Copy the Issuing CA
+                echo -e "${YELLOW}Moving TAK Server Public Certificate.${NC}"
+                echo -e "\n# Moving TAK Server Public Certificate.\n" &>> $logfile
+                cp $certs/truststore-$intCA.p12 $homeDir/caCert.p12
+                chown -R "$curuser":"$curuser" $homeDir
+                echo -e "${GREEN}[6/7]SKIP Certificate Auto Enrollment Configuration Task.${NC}" 2>&1 | tee -a $logfile
+            fi
+            if [ $serverFederation = 0 ]; then
+                hostPort[2]='-p 9001:9001'
+                echo -e "${GREEN}[7/7]Applying TAK Server Federation Configuration Task Complete.${NC}" 2>&1 | tee -a $logfile
+            else
+                echo -e "${GREEN}[7/7]SKIP TAK Server Federation Configuration Task.${NC}" 2>&1 | tee -a $logfile
+            fi
+            hostPorts="${hostPort[*]}"
+            rm $dir/CoreConfig.{xml,xml.backup}
+            docker run -it -v $dir:/opt/tak:z $hostPorts --network $dockerNet --name takserver -d takserver
+            echo -e "${YELLOW}Configuring TAK Server for final run.${NC}"
+            echo -e "${YELLOW}Please Wait...${NC}"
+            docker exec takserver bash -c "cd /opt/tak/logs && touch takserver-messaging.log"
+            ( tail -f -n0 $dir/logs/takserver-messaging.log & ) | grep -q "Started TAK Server messaging Microservice"
+            if [[ $@ = *-fips* ]]; then
+                docker exec takserver bash -c "cd /opt/tak/certs && ./makeCert.sh client webadmin --fips"
+            else
+                docker exec takserver bash -c "cd /opt/tak/certs && ./makeCert.sh client webadmin"
+            fi
+            docker exec takserver bash -c "java -jar /opt/tak/utils/UserManager.jar certmod -A /opt/tak/certs/files/webadmin.pem"
+            cp $certs/webadmin.p12 $homeDir/
+            if [ $certAEnrollment = 0 ]; then
+                create-datapackage
+                echo -e "${GREEN}Datapackage for $serverDesc copied to $homeDir/enrollmentDP.zip${NC}" 2>&1 | tee -a $logfile
+            else
+                echo -e "${GREEN}TAK Server Public Certificate copied to $homeDir/caCert.p12${NC}" 2>&1 | tee -a $logfile
+            fi
+            echo -e "${GREEN}Web Admin Certificate copied to $homeDir/webadmin.p12${NC}" 2>&1 | tee -a $logfile
+            echo -e "${GREEN}Initialization Complete.${NC}"
+            ;;
+    esac
+}
+
+#::::::::::
+# Begin Docker Installation
+#::::::::::
+installDocker(){
+    dockerTAK=$1
+    status=$(systemctl is-active docker) && echo -e "$status" &>> $logfile
+    if [ $status == "inactive" ]; then
+        echo -e "${RED}Docker service is not started.${NC}" 2>&1 | tee -a $logfile
+        echo -e "${YELLOW}Attempting to start the Docker service.${NC}" 2>&1 | tee -a $logfile
+        systemctl start docker
+        while [ $status == "active" ]; do
+            sleep 3
+        done
+        echo -e "${GREEN}Docker service STARTED.${NC}" 2>&1 | tee -a $logfile
+    fi
+    echo -e "${YELLOW}Installing additional packages.${NC}" 2>&1 | tee -a $logfile
+    case $distro in
+        rocky|rhel)
+            dnf install unzip zip dialog -y 2>&1 | tee -a $logfile
+        ;;
+        ubuntu|debian)
+            apt install unzip zip dialog -y 2>&1 | tee -a $logfile
+        ;;
+        photon)
+            tdnf install unzip zip dialog -y 2>&1 | tee -a $logfile
+        ;;
+    esac       
+    echo -e "${GREEN}Installation of additional packages Complete.${NC}" 2>&1 | tee -a $logfile
+    echo -e "${YELLOW}Extracting $dockerTAK.${NC}" 2>&1 | tee -a $logfile
+    unzip $1 -d $homeDir 2>&1 | tee -a $logfile
+    echo -e "${GREEN}Extraction of $dockerTAK Complete.${NC}" 2>&1 | tee -a $logfile
+    cd $homeDir
+    cd "${dockerTAK%????}"
+    dir=${PWD}/tak
+#Create Network
+    dockerNet="takserver"
+    docker network rm $dockerNet 2>&1 | tee -a $logfile
+    docker network create $dockerNet 2>&1 | tee -a $logfile
+#Create Persistent Volume
+    takDB="takserver_pgsql"
+    docker volume rm $takDB 2>&1 | tee -a $logfile
+    docker volume create $takDB 2>&1 | tee -a $logfile
+}
+
+# Execute Script
+case $1 in
+    *.rpm|*.deb)
+        # Determine if the user is root; else use sudo
+        [ "$UID" -eq 0 ] || exec sudo "$0" "$@"
+        # Conduct Prerequisite Checks
+        prerequisite $1
+        type="OS"
+        Install $1
+        takWizard
+    ;;
+    *.zip)
+        # Determine if the user is root; else use sudo
+        [ "$UID" -eq 0 ] || exec sudo "$0" "$@"
+        type="Container"
+        installDocker $1
+        takWizard
+    ;;
+    *)
+        echo -e "${RED}script usage:${NC} $(basename "$0") [path to TAK Server installer [rpm | deb | zip ]]\n" >&2
+        echo -e "${GREEN}TAK Server Binary Installation:${NC}" >&2
+        echo -e "${YELLOW}Example:${NC} $(basename "$0") /tmp/takserver-5.2-RELEASE43.noarch.rpm" >&2
+        echo -e "${YELLOW}Example:${NC} $(basename "$0") /tmp/takserver-5.2-RELEASE43_ALL.deb" >&2
+        echo -e "\n${GREEN}TAK Server Docker Installation:${NC}" >&2
+        echo -e "${YELLOW}Example:${NC} $(basename "$0") /tmp/takserver-docker-5.2-RELEASE-43.zip" >&2
+        exit 1
+    ;;
+esac
+
+# Perform Cleanup
+cd $homeDir
+rm -Rf $BASEDIR
+exit
