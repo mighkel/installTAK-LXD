@@ -956,12 +956,12 @@ case $1 in
         takWizard
     ;;
     *)
-        echo -e "${RED}script usage:${NC} $(basename "$0") [path to TAK Server installer [rpm | deb | zip ]]\n" >&2
+        echo -e "${RED}script usage:${NC} $(basename "$0") [TAK Server installer [rpm | deb | zip ]]\n" >&2
         echo -e "${GREEN}TAK Server Binary Installation:${NC}" >&2
-        echo -e "${YELLOW}Example:${NC} $(basename "$0") /tmp/takserver-5.2-RELEASE43.noarch.rpm" >&2
-        echo -e "${YELLOW}Example:${NC} $(basename "$0") /tmp/takserver-5.2-RELEASE43_ALL.deb" >&2
+        echo -e "${YELLOW}Example:${NC} $(basename "$0") takserver-5.2-RELEASE43.noarch.rpm" >&2
+        echo -e "${YELLOW}Example:${NC} $(basename "$0") takserver-5.2-RELEASE43_ALL.deb" >&2
         echo -e "\n${GREEN}TAK Server Docker Installation:${NC}" >&2
-        echo -e "${YELLOW}Example:${NC} $(basename "$0") /tmp/takserver-docker-5.2-RELEASE-43.zip" >&2
+        echo -e "${YELLOW}Example:${NC} $(basename "$0") takserver-docker-5.2-RELEASE-43.zip" >&2
         exit 1
     ;;
 esac
