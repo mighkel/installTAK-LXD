@@ -2,7 +2,7 @@
 #Version 0.1
 #JR@myTeckNet
 #globalVariables
-sVER="0.1 DEMO"
+sVER="1.0 Alpha Release"
 logfile="/tmp/.takinstall.log"
 RED='\033[0;31m'
 YELLOW='\033[0;33m'
@@ -544,6 +544,10 @@ set-LEFQDN(){
                 sed -i "s#connector port=\"8446\" clientAuth=\"false\" _name=\"cert_https\"#connector port=\"8446\" clientAuth=\"false\" _name=\"cert_https_LE\"  keystore=\"JKS\" keystoreFile=\"certs/files/${HOSTNAME}-le.jks\" keystorePass=\"${CAPASSWD}\"#g" $exampleconfigxml
                 echo -e "${GREEN}Requesting public certificate for: ${certREQ[0]} Task Complete.${NC}" 2>&1 | tee -a $logfile
                 # Create auto-renew script
+                # https://www.baeldung.com/linux/letsencrypt-renew-ssl-certificate-automatically
+                if [ -f /etc/cron.d/certbot ]; then
+                    sed -i "s/certbot -q renew --no-random-sleep-on-renew/certbot -q renew --no-random-sleep-on-renew $dir/renew-tak-le/g" /etc/cron.d/certbot
+                else
                 SLEEPTIME=$(awk 'BEGIN{srand(); print int(rand()*(3600+1))}'); echo "0 0,12 * * * root sleep $SLEEPTIME && certbot renew -q && /opt/tak/renew-tak-le" | sudo tee -a /etc/crontab > /dev/null
                 tee /etc/cron.d/certbot-tak-le >/dev/null <<EOF
 SHELL=/bin/sh
@@ -552,6 +556,7 @@ PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
 EOF
                 chmod 644 /etc/cron.d/certbot-tak-le
                 systemctl restart crond.service
+                fi
                 tee $dir/renew-tak-le >/dev/null <<EOF
 #!/bin/bash
 openssl pkcs12 -export -in $LEdir/live/${certREQ[0]}/fullchain.pem -inkey $LEdir/live/${certREQ[0]}/privkey.pem -out $certs/${HOSTNAME}-le.p12 -name ${certREQ[0]} -passin pass:${CAPASSWD} -passout pass:${CAPASSWD}
@@ -566,13 +571,34 @@ EOF
                 systemctl restart takserver.service && ( tail -f -n0 $dir/logs/takserver-messaging.log & ) | grep -q "Started TAK Server messaging Microservice"
             ;;
             Container)
-                Ccerts=/opt/tak/certs/files/
+                Ccerts=/opt/tak/certs/files
                 docker cp -L $LEdir/live/${certREQ[0]}/fullchain.pem takserver:$Ccerts
                 docker cp -L $LEdir/live/${certREQ[0]}/privkey.pem takserver:$Ccerts
                 docker exec takserver bash -c "openssl pkcs12 -export -in $Ccerts/fullchain.pem -inkey $Ccerts/privkey.pem -out $Ccerts/${HOSTNAME}-le.p12 -name ${certREQ[0]} -passin pass:${CAPASSWD} -passout pass:${CAPASSWD}"
                 docker exec takserver bash -c "keytool -importkeystore -destkeystore $Ccerts/${HOSTNAME}-le.jks -srckeystore $Ccerts/${HOSTNAME}-le.p12 -srcstoretype pkcs12 -deststorepass "${CAPASSWD}" -destkeypass "${CAPASSWD}" -srcstorepass "${CAPASSWD}""
                 sed -i "s#connector port=\"8446\" clientAuth=\"false\" _name=\"cert_https\"#connector port=\"8446\" clientAuth=\"false\" _name=\"cert_https_LE\"  keystore=\"JKS\" keystoreFile=\"certs/files/${HOSTNAME}-le.jks\" keystorePass=\"${CAPASSWD}\"#g" $configxml
                 sed -i "s#connector port=\"8446\" clientAuth=\"false\" _name=\"cert_https\"#connector port=\"8446\" clientAuth=\"false\" _name=\"cert_https_LE\"  keystore=\"JKS\" keystoreFile=\"certs/files/${HOSTNAME}-le.jks\" keystorePass=\"${CAPASSWD}\"#g" $exampleconfigxml
+                if [ -f /etc/cron.d/certbot ]; then
+                    sed -i "s/certbot -q renew --no-random-sleep-on-renew/certbot -q renew --no-random-sleep-on-renew $dir/renew-tak-le/g" /etc/cron.d/certbot
+                else
+                    tee $dir/certbot-tak-le >/dev/null <<EOF
+SHELL=/bin/sh
+PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
+0 */12 * * * root certbot -q renew && $dir/renew-tak-le
+EOF
+                    SLEEPTIME=$(awk 'BEGIN{srand(); print int(rand()*(3600+1))}'); echo "0 0,12 * * * root sleep $SLEEPTIME && certbot renew -q && /opt/tak/renew-tak-le" | sudo tee -a /etc/crontab > /dev/null
+                    chmod 644 $dir/certbot-tak-le
+                    systemctl restart crond.service
+                fi
+                tee $dir/renew-tak-le >/dev/null <<EOF
+#!/bin/bash
+docker cp -L $LEdir/live/${certREQ[0]}/fullchain.pem takserver:$Ccerts
+docker cp -L $LEdir/live/${certREQ[0]}/privkey.pem takserver:$Ccerts
+docker exec takserver bash -c "openssl pkcs12 -export -in $Ccerts/fullchain.pem -inkey $Ccerts/privkey.pem -out $Ccerts/${HOSTNAME}-le.p12 -name ${certREQ[0]} -passin pass:${CAPASSWD} -passout pass:${CAPASSWD}"
+docker exec takserver bash -c "keytool -importkeystore -destkeystore $Ccerts/${HOSTNAME}-le.jks -srckeystore $Ccerts/${HOSTNAME}-le.p12 -srcstoretype pkcs12 -deststorepass "${CAPASSWD}" -destkeypass "${CAPASSWD}" -srcstorepass "${CAPASSWD}""
+docker restart takserver
+EOF
+                chmod +x $dir/renew-tak-le
             ;;
         esac
     echo -e "${GREEN}Let's Encrypt Certificate Successfully applied.${NC}" 2>&1 | tee -a $logfile
