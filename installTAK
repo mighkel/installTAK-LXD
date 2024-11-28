@@ -867,8 +867,10 @@ executeConfiguration(){
             cp $certs/webadmin.p12 $homeDir/
             if [ $certAEnrollment = 0 ]; then
                 create-datapackage
+                clear
                 echo -e "${GREEN}Datapackage for $serverDesc copied to $homeDir/enrollmentDP.zip${NC}" 2>&1 | tee -a $logfile
             else
+                clear
                 echo -e "${GREEN}TAK Server Public Certificate copied to $homeDir/caCert.p12${NC}" 2>&1 | tee -a $logfile
             fi
             echo -e "${GREEN}Web Admin Certificate copied to $homeDir/webadmin.p12${NC}" 2>&1 | tee -a $logfile
