@@ -122,7 +122,7 @@ Install(){
             echo -e "${GREEN}[3/8]EPEL Task Complete.${NC}" 2>&1 | tee -a $logfile
         ;;
         ubuntu|debian)
-            echo -e "${GREEN}[3/8]Debian System detected, EPEL Skippped.${NC}" 2>&1 | tee -a $logfile
+            echo -e "${GREEN}[3/8]Debian System detected, EPEL Skipped.${NC}" 2>&1 | tee -a $logfile
         ;;
     esac
 
@@ -231,7 +231,7 @@ set-certproperties(){
     "State:" 2 1 "$State" 2 20 30 0 \
     "City:" 3 1 "$City" 3 20 30 0 \
     "Organization:" 4 1 "$Organization" 4 20 30 0 \
-    "Oranizational Unit:" 5 1 "$Organizational_Unit" 5 20 30 0 \
+    "Organizational Unit:" 5 1 "$Organizational_Unit" 5 20 30 0 \
     2>&1 1>&3))        
     exec 3>&-
 }
@@ -311,7 +311,7 @@ set-certauthname() {
 # Prompt for Intermediate Certificate Authority Name
     intCA="$(dialog --clear --no-cancel --backtitle "$backTitle" \
         --title "TAK Server PKI Configuration" \
-        --inputbox "The Intermediate CA will act as the Issing CA for all certificates on the behalf of the Root CA."'
+        --inputbox "The Intermediate CA will act as the Issuing CA for all certificates on the behalf of the Root CA."'
 '"\n\nEnter a name for the Intermediate CA:" 0 0 \
         2>&1 1>&3)"
     if [[ $intCA = "" ]]; then
