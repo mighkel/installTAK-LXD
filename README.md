@@ -1,8 +1,11 @@
 [tpc]: https://tak.gov
 [takServer]: https://tak.gov/products/tak-server
 [mytecknet-ca]: https://mytecknet.com/lets-sign-our-tak-server/
+[walkthrough]: https://youtu.be/-mjqOsbfu9c
 # Description
 Using the [TAK Server installation binaries or Docker images][takserver] provided by [TAK.gov][tpc], the `installTAK` script provides a one-command installation solution for all TAK enthusiasts to get a TAK Server up and running in minutes on a freshly installed operating system.
+
+A video walk-through can be found [here][walkthrough].
 
 ## Operating Systems Tested:
 All operating systems were tested with a minimal installation unless specifically annotated differently.
