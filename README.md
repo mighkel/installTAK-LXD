@@ -1,5 +1,6 @@
 [tpc]: https://tak.gov
 [takServer]: https://tak.gov/products/tak-server
+[mytecknet-ca]: https://mytecknet.com/lets-sign-our-tak-server/
 # Description
 Using the [TAK Server installation binaries or Docker images][takserver] provided by [TAK.gov][tpc], the `installTAK` script provides a one-command installation solution for all TAK enthusiasts to get a TAK Server up and running in minutes on a freshly installed operating system.
 
@@ -9,7 +10,7 @@ All operating systems were tested with a minimal installation unless specificall
 - Ubuntu Server 22
 - Docker version 24
 - PhotonOS w/ Docker Installed
-- Rasbian Desktop (64-bit) on Raspberry Pi 5 w/ 8GB RAM
+- Raspbian Desktop (64-bit) on Raspberry Pi 5 w/ 8GB RAM
 
 # Installation
 To install the `installTAK` script from the source use the following commands to install the repository to a folder of your choice:
@@ -75,6 +76,11 @@ If you wish to change the default certificate password, you have the option to d
 
 ![TAK Wizard Prompt 03](lib/img/takwizard_prompt03.png "Change Default Certificate Password?")
 
+### [Optional] Certificate Password
+If you select **yes** to change the default certificate password, enter your new password here.
+
+![TAK Wizard Prompt 03a](lib/img/takwizard_prompt03a.png "Change Default Certificate Password?")
+
 Enter the name for your Root Certificate Authority (CA); otherwise, if you leave this blank a random name will be generated for you.
 
 ![TAK Wizard Prompt 04](lib/img/takwizard_prompt04.png "Root Certificate Authority (CA)")
@@ -98,13 +104,38 @@ The following prompt provides the configuration summary.  Review this prompt for
 ### [Optional] Certificate Enrollment
 If you selected **yes** to enable certificate auto-enrollment, you will be presented with an input to name this TAK Server description connection.  This will be displayed on the TAK Clients as the friendly name.
 
-![TAK Wizard Prompt 08](lib/img/takDP_wizard01.png "TAK Server Description")
+![TAK Wizard Prompt 09](lib/img/takDP_wizard01.png "TAK Server Description")
 
 If your TAK Server is public facing and has a registered Domain Name and associated record you can select yes to enter the FQDN information here.  Otherwise, selecting **no** will use the ip address for connections.
 
-![TAK Wizard Prompt 08](lib/img/takDP_wizard02.png "Fully Qualified Domain Name")
+![TAK Wizard Prompt 10](lib/img/takDP_wizard02.png "Fully Qualified Domain Name")
+
+### [Optional] Fully Qualified Domain Name (FQDN) Connections
+If you selected **yes** that this TAK Server supports FQDN Connections, you will be asked how this TAK Server will be trusted.  If you or your organization have a registered Domain Name, select **Local**.  
+
+![TAK Wizard Prompt 10](lib/img/fqdn_wizard01.png "Fully Qualified Domain Name")
+
+Selecting Local will not create a certificate signing request as the local csr can be used or a local one be generated manually.  Click [here][mytecknet-ca] learn more about using a third-party certificate signer.  By default, the TAK Server IP Address is displayed.
+
+![TAK Wizard Prompt 10a](lib/img/fqdn_wizard01a.png "Local Fully Qualified Domain Name")
+
+Selecting **Let's Encrypt** will utilize Let's Encrypt as the public Certificate Authority and will begin the public certificate signing request and issuance.
+
+Before continuing with the **Let's Encrypt** configuration ensure that you allow TCP port 80 into your network by either enabling port forwarding in your router to the TAK Server or cloud service provider (CSP).  Consult your CSP for specific instructions.
+
+![TAK Wizard Prompt 11](lib/img/fqdn_wizard02.png "Let's Encrypt Fully Qualified Domain Name")
+
+Enter the public host record for this TAK Server.  This is commonly associated to the Host Record created in the Domain Name System (DNS) Server or your DNS cloud provider.  Additionally, enter an email to associate this host record; by <u>**default**</u> this email **will not** be shared with *Let's Encrypt* or *Certbot* however is a requirement in the certificate request.
+
+![TAK Wizard Prompt 12](lib/img/fqdn_wizard03.png "Let's Encrypt Fully Qualified Domain Name")
+
+The following prompt provides the configuration summary.  Review this prompt for accuracy, select **Confirm** to commit all changes or select **Reset Wizard** to run through the Let's Encrypt Wizard again.
+
+![TAK Wizard Prompt 13](lib/img/fqdn_wizard04.png "Let's Encrypt Fully Qualified Domain Name")
 
 ### Post Installation Files
+After successful installation the local *installTAK* repo will delete itself since its only meant to run once.  The TAK Server installation binary and dependencies will be included.  Based on your responses to the TAK Setup Wizard the following files will be created in the current users Linux home directory (/home/$USER) or if root (/root).
+
 - Certificate Auto-Enrollment
     - Yes: enrollmentDP.zip
     - No: caCert.p12
