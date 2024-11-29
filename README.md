@@ -16,15 +16,16 @@ All operating systems were tested with a minimal installation unless specificall
 To install the `installTAK` script from the source use the following commands to install the repository to a folder of your choice:
 ```shell
 git clone https://github.com/myTeckNetCode/installTAK.git ./installTAK --recurse-submodules
+```
+The above command will install the installTAK script in the current directory in a new folder called *installTAK*.  After the repository has been cloned navigate to the *installTAK* directory.
+```
 cd installTAK
 ```
-The above command will install the installTAK script in the current directory in a new folder called *installTAK*.
 
 If you have not done so already, head to [TAK.gov][tpc], download the [TAK Server][takserver] installation files, and place them in this newly created *installTAK* directory.
 
-Run the following command to begin the installation:
+Run the following command to display the installation arguments:
 ```shell
-chmod +x installTAK
 ./installTAK
 ```
 Running `installTAK` alone will display the intended command usage.  For example is the **takserver-5.2-RELEASE43.noarch.rpm** and **takserver-public-gpg.key** are in the installTAK directory run the following:

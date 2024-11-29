@@ -546,7 +546,7 @@ set-LEFQDN(){
                 # Create auto-renew script
                 # https://www.baeldung.com/linux/letsencrypt-renew-ssl-certificate-automatically
                 if [ -f /etc/cron.d/certbot ]; then
-                    sed -i "s/certbot -q renew --no-random-sleep-on-renew/certbot -q renew --no-random-sleep-on-renew $dir/renew-tak-le/g" /etc/cron.d/certbot
+                    sed -i "s#certbot -q renew --no-random-sleep-on-renew#certbot -q renew --no-random-sleep-on-renew $dir/renew-tak-le#g" /etc/cron.d/certbot
                 else
                 SLEEPTIME=$(awk 'BEGIN{srand(); print int(rand()*(3600+1))}'); echo "0 0,12 * * * root sleep $SLEEPTIME && certbot renew -q && /opt/tak/renew-tak-le" | sudo tee -a /etc/crontab > /dev/null
                 tee /etc/cron.d/certbot-tak-le >/dev/null <<EOF
@@ -568,7 +568,14 @@ EOF
                 chown -R tak:tak $dir
                 echo -e "\n# Restarting TAK Server to apply new configurations.\n" &>> $logfile
                 echo -e "${YELLOW}Please Wait...${NC}"
+                if [ -f "/etc/apt/sources.list.d/raspi.list" ]; then
+                # Services must start in this order [Raspberry Pi]
+                systemctl start takserver-config
+                systemctl start takserver-messaging
+                systemctl start takserver-api                
+                else
                 systemctl restart takserver.service && ( tail -f -n0 $dir/logs/takserver-messaging.log & ) | grep -q "Started TAK Server messaging Microservice"
+                fi
             ;;
             Container)
                 Ccerts=/opt/tak/certs/files
@@ -750,9 +757,10 @@ executeConfiguration(){
                 sh install.sh
                 echo -e "${YELLOW}Please Wait...${NC}"
                 echo -e "\n# [Raspberry Pi OS]This could take up to 1-3 Minutes to complete.\n" &>> $logfile
+                # Services must start in this order
                 systemctl start takserver-config
-                systemctl start takserver-api
                 systemctl start takserver-messaging
+                systemctl start takserver-api
             else
                 echo -e "${YELLOW}Please Wait...${NC}"
                 systemctl enable takserver && systemctl start takserver.service
