@@ -2,7 +2,7 @@
 #Version 1.1
 #JR@myTeckNet
 #globalVariables
-sVER="1.0 Alpha Release"
+sVER="1.1 Alpha Release"
 logfile="/tmp/.takinstall.log"
 RED='\033[0;31m'
 YELLOW='\033[0;33m'
