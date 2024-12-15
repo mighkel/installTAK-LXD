@@ -10,10 +10,13 @@ A video walk-through can be found [here][walkthrough].
 ## Operating Systems Tested:
 All operating systems were tested with a minimal installation unless specifically annotated differently.
 - Rocky Linux 8
-- Ubuntu Server 22
+- **Ubuntu Server 22 LTS**
+- **Ubuntu Server 24 LTS**
 - Docker version 24
 - PhotonOS w/ Docker Installed
 - Raspbian Desktop (64-bit) on Raspberry Pi 5 w/ 8GB RAM
+
+**NOTE:** *Ubuntu Long Term Support (TLS)* versions tested only, all other versions may not work.
 
 # Installation
 To install the `installTAK` script from the source use the following commands to install the repository to a folder of your choice:
