@@ -48,7 +48,7 @@ prerequisite(){
                 fi
             fi
         ;;
-        ubuntu|debian)
+        ubuntu)
             if ! [[ $distro_ver =~ 24.04 ]] && ! [[ $distro_ver =~ 22.04 ]] ; then
                 echo -e "${RED}ERR: Platform Version Unsupported.${NC}"
                 abort
