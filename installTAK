@@ -36,7 +36,7 @@ prerequisite(){
     case $distro in
         rocky|rhel)
             if ! [[ $distro_ver =~ 9 ]]; then
-                echo -e "${RED}ERR: Platform Version Unsupported.{NC}"
+                echo -e "${RED}ERR: Platform Version Unsupported.${NC}"
                 abort
             else
                 gpgKEY=$(find ${PWD} -name 'takserver-public-gpg.key' -type f -exec ls -t1 {} + | head -1)
@@ -793,6 +793,7 @@ executeConfiguration(){
                 ubuntu|debian)
                     ufw allow 8089 >/dev/null
                     ufw allow 8443 >/dev/null
+                    ufw enable >/dev/null
                 ;;
             esac
             clear
@@ -964,6 +965,6 @@ case $1 in
 esac
 
 # Perform Cleanup
-cd $homeDir
 rm -Rf $BASEDIR
+cd $homeDir
 exit
