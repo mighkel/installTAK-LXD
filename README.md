@@ -34,11 +34,16 @@ Run the following command to display the installation arguments:
 ```shell
 ./installTAK
 ```
-Running `installTAK` alone will display the intended command usage.  For example is the **takserver-5.2-RELEASE43.noarch.rpm** and **takserver-public-gpg.key** are in the installTAK directory run the following:
+Running `installTAK` alone will display the intended command usage.  For example is the **takserver-5.3-RELEASE4.noarch.rpm** and **takserver-public-gpg.key** are in the installTAK directory run the following:
 ```shell
-./installTAK takserver-5.2-RELEASE43.noarch.rpm
+./installTAK takserver-5.3-RELEASE4.noarch.rpm
 ```
 For Ubuntu/Debian systems ensure to download the **deb_policy.pol** and place it in the *installTAK* directory.
+
+To enable **FIPS** Certificates append *--fips* at the end of the command.  Custom certificates with stronger algorithms will be generated for use on systems with **FIPS** enabled.  **ATAK** may not support certificates generated with these stronger algorithms.  Use at your own discretion.
+```shell
+./installTAK takserver-5.3-RELEASE4.noarch.rpm --fips
+```
 
 ## Installation from Download ZIP
 Installation from ZIP requires external repository contents.  Download the **installTAK.zip** and then download the **tak-server-systemd.zip** from [here](https://github.com/talentedbrute/tak-server-systemd).
@@ -103,6 +108,10 @@ Certificate enrollment allows you as the TAK Administrator to pass a preconfigur
 Enabling TAK Server Federation allows you to share data that is owned by the TAK Server to other TAK Servers.  Selecting **yes** here will open TCP Port `9001` for inbound TAK Federation.
 
 ![TAK Wizard Prompt 07](lib/img/takwizard_prompt07.png "Enable TAK Server Federation?")
+
+By default the TAK Server accepts connections over **SSL/TLS**.  Additionally, the TAK Server supports the **QUIC** protocol.  Select the appropriate connection type for this TAK Server.
+
+![TAK Connection Types](lib/img/connector_wizard01.png "TAK Server Connection Types")
 
 The following prompt provides the configuration summary.  Review this prompt for accuracy, select **Confirm** to commit all changes or select **Reset Wizard** to run through the TAK Wizard again.
 
