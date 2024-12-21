@@ -1,8 +1,9 @@
 #!/bin/bash
-#Version 1.1
+#Version 1.3
 #JR@myTeckNet
 #globalVariables
-sVER="1.1 Alpha Release"
+fips=${2:-false}
+sVER="1.3 Alpha Release"
 logfile="/tmp/.takinstall.log"
 RED='\033[0;31m'
 YELLOW='\033[0;33m'
@@ -35,7 +36,7 @@ prerequisite(){
 # Determine Linux Version
     case $distro in
         rocky|rhel)
-            if ! [[ $distro_ver =~ 9 ]]; then
+            if ! [[ $distro_ver =~ [8] ]]; then
                 echo -e "${RED}ERR: Platform Version Unsupported.${NC}"
                 abort
             else
@@ -49,7 +50,7 @@ prerequisite(){
             fi
         ;;
         ubuntu)
-            if ! [[ $distro_ver =~ 24.04 ]] && ! [[ $distro_ver =~ 22.04 ]] ; then
+            if ! [[ $distro_ver =~ 2[2|4].10 ]]; then
                 echo -e "${RED}ERR: Platform Version Unsupported.${NC}"
                 abort
             else
@@ -89,7 +90,7 @@ prerequisite(){
 # Begin RPM/DEB Installation
 #::::::::::
 Install(){
-    takRPM=$1
+    takBinary=$1
     dir=/opt/tak
 
 # Gather System Information for logging
@@ -106,11 +107,12 @@ Install(){
     echo -e "\n# Installing Extra Packages for Linux.\n" &>> $logfile
     case $distro in
         rocky)
-            if [[ $distro_ver = 9 ]]; then
-                sudo dnf config-manager --set-enabled crb 2>&1 | tee -a $logfile && dnf install epel-release -y 2>&1 | tee -a $logfile
-            else
-                dnf config-manager --set-enabled powertools 2>&1 | tee -a $logfile && dnf install epel-release -y 2>&1 | tee -a $logfile
-            fi
+            case $distro_ver in
+                8.*) dnf config-manager --set-enabled powertools 2>&1 | tee -a $logfile && dnf install epel-release -y 2>&1 | tee -a $logfile
+                ;;
+                9.*) dnf config-manager --set-enabled crb 2>&1 | tee -a $logfile && dnf install epel-release -y 2>&1 | tee -a $logfile
+                ;;
+            esac
             echo -e "${GREEN}[3/8]EPEL Task Complete.${NC}" 2>&1 | tee -a $logfile
         ;;
         rhel)
@@ -120,9 +122,18 @@ Install(){
                 echo -e "${RED}This system is not registered with an entitlement server. You can use subscription-manager to register.${NC}" 2>&1 | tee -a $logfile
                 abort
             fi
-            subscription-manager repos --enable codeready-builder-for-rhel-8-$(arch)-rpms 2>&1 | tee -a $logfile
-            rpm --import https://dl.fedoraproject.org/pub/epel/RPM-GPG-KEY-EPEL-8 
-            dnf install https://dl.fedoraproject.org/pub/epel/epel-release-latest-8.noarch.rpm -y 2>&1 | tee -a $logfile
+            case $distro_ver in
+                8.*)
+                    subscription-manager repos --enable codeready-builder-for-rhel-8-$(arch)-rpms 2>&1 | tee -a $logfile
+                    rpm --import https://dl.fedoraproject.org/pub/epel/RPM-GPG-KEY-EPEL-8 
+                    dnf install https://dl.fedoraproject.org/pub/epel/epel-release-latest-8.noarch.rpm -y 2>&1 | tee -a $logfile
+                ;;
+                9.*)
+                    subscription-manager repos --enable codeready-builder-for-rhel-9-$(arch)-rpms 2>&1 | tee -a $logfile
+                    rpm --import https://dl.fedoraproject.org/pub/epel/RPM-GPG-KEY-EPEL-9
+                    dnf install https://dl.fedoraproject.org/pub/epel/epel-release-latest-9.noarch.rpm -y 2>&1 | tee -a $logfile
+                ;;
+            esac
             echo -e "${GREEN}[3/8]EPEL Task Complete.${NC}" 2>&1 | tee -a $logfile
         ;;
         ubuntu|debian)
@@ -136,7 +147,12 @@ Install(){
     case $distro in
         rocky|rhel)
             rpm --import https://download.postgresql.org/pub/repos/yum/keys/PGDG-RPM-GPG-KEY-RHEL
-            dnf install https://download.postgresql.org/pub/repos/yum/reporpms/EL-8-$(arch)/pgdg-redhat-repo-latest.noarch.rpm -y 2>&1 | tee -a $logfile
+            case $distro_ver in
+                8.*) dnf install https://download.postgresql.org/pub/repos/yum/reporpms/EL-8-$(arch)/pgdg-redhat-repo-latest.noarch.rpm -y 2>&1 | tee -a $logfile
+                ;;
+                9.*) dnf install https://download.postgresql.org/pub/repos/yum/reporpms/EL-9-$(arch)/pgdg-redhat-repo-latest.noarch.rpm -y 2>&1 | tee -a $logfile
+                ;;
+            esac
             dnf -qy module disable postgresql &>> $logfile
             echo -e "${GREEN}[4/8]PostgreSQL and PostGIS Task Complete.${NC}" 2>&1 | tee -a $logfile
         ;;
@@ -164,17 +180,25 @@ Install(){
     echo -e "${GREEN}[5/8]Java-OpenJDK Task Complete.${NC}" 2>&1 | tee -a $logfile
 
 # Perform TAK Server Installation
-    echo -e "${YELLOW}Installing $takRPM...${NC}"
-    echo -e "\n# Installing $takRPM.\n" &>> $logfile
+    echo -e "${YELLOW}Installing $takBinary...${NC}"
+    echo -e "\n# Installing $takBinary.\n" &>> $logfile
     case $distro in
         rocky|rhel)
-            dnf install $takRPM -y 2>&1 | tee -a $logfile
+            dnf install $takBinary -y 2>&1 | tee -a $logfile
+            servicePostgreSQL="postgresql-15"
         ;;
         ubuntu|debian)
-            apt install ./$takRPM -y 2>&1 | tee -a $logfile
+            apt install ./$takBinary -y 2>&1 | tee -a $logfile
+            servicePostgreSQL="postgresql"
         ;;
     esac
-    echo -e "${GREEN}[6/8]Installation of $takRPM Task Complete.${NC}" 2>&1 | tee -a $logfile
+    # Check TAK Server installation
+    if [ $(systemctl is-active $servicePostgreSQL) == active ]; then
+        echo -e "${GREEN}[6/8]Installation of $takBinary Task Complete.${NC}" 2>&1 | tee -a $logfile
+    else
+        echo -e "${RED}[6/8]Installation of $takBinary Task, PostgreSQL/PostGIS Service not found.${NC}" 2>&1 | tee -a $logfile
+        abort
+    fi    
 
 # Configure SELinux
     echo -e "${YELLOW}Configuring SELinux...${NC}"
@@ -236,7 +260,7 @@ set-certproperties(){
     "City:" 3 1 "$City" 3 20 30 0 \
     "Organization:" 4 1 "$Organization" 4 20 30 0 \
     "Organizational Unit:" 5 1 "$Organizational_Unit" 5 20 30 0 \
-    2>&1 1>&3))        
+    2>&1 1>&3))
     exec 3>&-
 }
 apply-certproperties(){
@@ -287,7 +311,7 @@ apply-certauthpass() {
         sed -i s/atakatak/$CAPASSWD/g $exampleconfigxml
         echo -e "${GREEN}Applying Certificate Password Task Complete.${NC}" &>> $logfile
     else
-        echo -e "${YELLOW}Certificate Password Unchanged...${NC}" &>> $logfile
+        echo -e "${YELLOW}Certificate Password Unchanged...${NC}"
         echo -e "\n# Certificate Password Unchanged.\n" &>> $logfile
         CAPASSWD=atakatak
     fi
@@ -333,7 +357,7 @@ apply-certauthname() {
     echo -e "\n# Creating Root Certificate Authority ${rootCA}.\n" &>> $logfile
 # Create new RootCA
     cd $dir/certs || exit
-    if [[ $@ = *-fips* ]]; then
+    if [[ $fips == "true" ]]; then
         $makerootca --ca-name "$rootCA" --fips
     else
         $makerootca --ca-name "$rootCA"
@@ -342,7 +366,7 @@ apply-certauthname() {
 # Create Intermediate CA
     echo -e "${YELLOW}Creating Intermediate/Issuing Certificate Authority ${intCA}...${NC}"
     echo -e "\n# Creating Intermediate/Issuing Certificate Authority ${intCA}.\n" &>> $logfile
-    if [[ $@ = *-fips* ]]; then
+    if [[ $fips == "true" ]]; then
         echo y | $makeCert ca "$intCA" --fips
     else
         echo y | $makeCert ca "$intCA"
@@ -360,7 +384,7 @@ apply-certauthname() {
 # Create new TAK Server Certificate
     echo -e "${YELLOW}Creating the Client Certificate for ${HOSTNAME}...${NC}"
     echo -e "\n# Creating the Client Certificate for ${HOSTNAME}.\n" &>> $logfile
-    if [[ $@ = *-fips* ]]; then
+    if [[ $fips == "true" ]]; then
         $makeCert server ${HOSTNAME} --fips
     else
         $makeCert server ${HOSTNAME}
@@ -616,6 +640,68 @@ EOF
     echo -e "${GREEN}Let's Encrypt Certificate Task Complete.${NC}"
 }
 
+set-takConnector(){
+oldIFS="$IFS"
+IFS=$'\n'
+exec 3>&1
+takConnectorType=($(dialog --clear --ok-label "Continue" --no-cancel --backtitle "$backTitle" --title "TAK Server Connection Type" --checklist "To connect to the TAK Server, clients must connect securely to an open port on both the server and network.\n\n"'
+'"The TAK Server supports two types of connections: TCP/SSL and UDP/QUIC.  Select the type of connection to support based on your network requirements.\n\n"'
+'"- TCP/SSL is the default and communicates over TCP/8089, selecting this option will allow TCP inbound connections to this server.\n\n"'
+'"- UDP/QUIC is an alternate communications port over UDP/8090, selecting this option will allow UDP inbound connections to this server.\n\n"'
+'"Select SSL, QUIC or both to support this type of connection." 19 85 0 \
+        SSL "Enable TCP/SSL/TLS Connections" on \
+        QUIC "Enable UDP/QUIC Connections" off \
+        2>&1 1>&3))
+exec 3>&-
+IFS="$oldIFS"
+}
+
+apply-takConnector(){
+    if ! [[ $takConnectorType ]]; then
+        exec 3>&1
+        dialog --clear --infobox "Try Again" 10 30
+        exec 3>&-
+        set-takConnector
+    else
+        case $takConnectorType in
+            "SSL")
+            case $distro in
+                rocky|rhel)
+                    firewall-cmd --zone=public --add-port 8089/tcp --permanent >/dev/null
+                    firewall-cmd --reload >/dev/null
+                ;;
+                ubuntu|debian)
+                    ufw allow 8089 >/dev/null
+                ;;
+            esac
+            ;;
+            "QUIC")
+            case $distro in
+                rocky|rhel)
+                    firewall-cmd --zone=public --add-port 8090/udp --permanent >/dev/null
+                    firewall-cmd --reload >/dev/null
+                ;;
+                ubuntu|debian)
+                    ufw allow 8090/udp >/dev/null
+                ;;
+            esac            
+            ;;
+            "SSL QUIC")
+            case $distro in
+                rocky|rhel)
+                    firewall-cmd --zone=public --add-port 8089/tcp --add-port 8090/udp --permanent >/dev/null
+                    firewall-cmd --reload >/dev/null
+                ;;
+                ubuntu|debian)
+                    ufw allow 8089 >/dev/null
+                    ufw allow 8090/udp >/dev/null
+                ;;
+            esac
+            ;;
+        esac
+    fi
+}
+
 # Establish the DataPackage/Enrollment Process
 create-datapackage() {
 # Create temp dir
@@ -656,6 +742,14 @@ create-datapackage() {
     fi
     exec 3>&-
 
+case $takConnectorType in
+    "SSL") connectorPort="8089:ssl";;
+    "QUIC") connectorPort="8090:quic";;
+    "SSL QUIC") connectorPort="8089:ssl"
+        connectorPort2="8090:quic"
+    ;;
+esac
+
 # config.cnf
         tee config.pref >/dev/null <<EOF
 <?xml version='1.0' encoding='ASCII' standalone='yes'?>
@@ -664,7 +758,7 @@ create-datapackage() {
     <entry key="count" class="class java.lang.Integer">1</entry>
     <entry key="description0" class="class java.lang.String">$serverDesc</entry>
     <entry key="enabled0" class="class java.lang.Boolean">true</entry>
-    <entry key="connectString0" class="class java.lang.String">$serverEndPoint:8089:ssl</entry>
+    <entry key="connectString0" class="class java.lang.String">$serverEndPoint:$connectorPort</entry>
     <entry key="caLocation0" class="class java.lang.String">cert/caCert.p12</entry>
     <entry key="caPassword0" class="class java.lang.String">$CAPASSWD</entry>
     <entry key="enrollForCertificateWithTrust0" class="class java.lang.Boolean">true</entry>
@@ -673,6 +767,9 @@ create-datapackage() {
 </preference>
 <preference version="1" name="com.atakmap.app_preferences">
     <entry key="displayServerConnectionWidget" class="class java.lang.Boolean">true</entry>
+    <entry key="network_quic_enabled" class="class java.lang.Boolean">true</entry>
+    <entry key="apiSecureServerPort" class="class java.lang.String">8443</entry>
+    <entry key="apiCertEnrollmentPort" class="class java.lang.String">8446</entry>
     <entry key="locationTeam" class="class java.lang.String">Blue</entry>
     <entry key="atakRoleType" class="class java.lang.String">Team Member</entry>
 </preference>
@@ -698,6 +795,11 @@ EOF
     cp $certs/truststore-$intCA.p12 /tmp/enrollmentDP/caCert.p12
 
     zip -j $homeDir/enrollmentDP.zip /tmp/enrollmentDP/*
+    if [ -v connectorPort2 ];then
+        sed -i "s/8089:ssl/$connectorPort2/g" /tmp/enrollmentDP/config.pref
+        sed -i "s/enrollmentDP/enrollmentDP-QUIC/g" /tmp/enrollmentDP/MANIFEST.xml
+        zip -j $homeDir/enrollmentDP-QUIC.zip /tmp/enrollmentDP/*
+    fi
     chown -R "$curuser":"$curuser" $homeDir
     cd /tmp
     rm -Rf enrollmentDP
@@ -707,7 +809,7 @@ create-webadmin(){
     echo -e "${YELLOW}Creating Admin Certificate...${NC}"
     echo -e "\n# Creating Admin Certificate.\n" &>> $logfile
     cd $dir/certs || exit
-    if [[ $@ = *-fips* ]]; then
+    if [[ $fips == "true" ]]; then
         echo y | $makeCert client webadmin --fips
     else
         echo y | $makeCert client webadmin
@@ -735,6 +837,7 @@ takWizard(){
     set-certauthname
     set-certautoenroll
     set-takfederation
+    set-takConnector
     finalize-install
 }
 # Establish the Execution Workflow
@@ -747,6 +850,7 @@ executeConfiguration(){
             apply-certauthname
             apply-certautoenroll
             apply-takfederation
+            apply-takConnector
             echo -e "${YELLOW}Configuring TAK Server for first run.${NC}"
             echo -e "\n# Configuring TAK Server for first run.\n" &>> $logfile
             touch $dir/logs/takserver-messaging.log
@@ -786,19 +890,18 @@ executeConfiguration(){
             create-webadmin
             case $distro in
                 rocky|rhel)
-                    # Add the default firewall ports
-                    firewall-cmd --zone=public --add-port 8089/tcp --add-port 8443/tcp --permanent >/dev/null
+                    # Add the api firewall port
+                    firewall-cmd --zone=public --add-port 8443/tcp --permanent >/dev/null
                     firewall-cmd --reload >/dev/null
                 ;;
                 ubuntu|debian)
-                    ufw allow 8089 >/dev/null
                     ufw allow 8443 >/dev/null
                     ufw enable >/dev/null
                 ;;
             esac
             clear
             if [ $certAEnrollment = 0 ]; then
-                echo -e "${GREEN}Datapackage for $serverDesc copied to $homeDir/enrollmentDP.zip${NC}" 2>&1 | tee -a $logfile
+                echo -e "${GREEN}Datapackages for $serverDesc copied to $homeDir${NC}" 2>&1 | tee -a $logfile
             else
                 echo -e "${GREEN}TAK Server Public Certificate copied to $homeDir/caCert.p12${NC}" 2>&1 | tee -a $logfile
             fi
@@ -821,13 +924,13 @@ executeConfiguration(){
             echo -e "${YELLOW}Configuring TAK Server for first run.${NC}"
             echo -e "${YELLOW}Please Wait...${NC}"
             sleep 10
-            if [[ $@ = *-fips* ]]; then
+            if [[ $fips == "true" ]]; then
                 docker exec takserver bash -c "cd /opt/tak/certs && ./makeRootCa.sh --ca-name $rootCA --fips"
             else
                 docker exec takserver bash -c "cd /opt/tak/certs && ./makeRootCa.sh --ca-name $rootCA"
             fi
             echo -e "${GREEN}[2/7]Creating Root Certificate Authority ${rootCA} Task Complete.${NC}" 2>&1 | tee -a $logfile
-            if [[ $@ = *-fips* ]]; then
+            if [[ $fips == "true" ]]; then
                 docker exec takserver bash -c "cd /opt/tak/certs && echo y |./makeCert.sh ca $intCA --fips"
             else
                 docker exec takserver bash -c "cd /opt/tak/certs && echo y |./makeCert.sh ca $intCA"
@@ -836,7 +939,7 @@ executeConfiguration(){
             
             sed -i "s/truststore-root/truststore-$intCA/g" $dir/CoreConfig.xml
             echo -e "${GREEN}[4/7]Updating the CoreConfiguration Files Task Complete.${NC}" 2>&1 | tee -a $logfile
-            if [[ $@ = *-fips* ]]; then
+            if [[ $fips == "true" ]]; then
                 docker exec takserver bash -c "cd /opt/tak/certs && ./makeCert.sh server ${HOSTNAME} --fips"
             else
                 docker exec takserver bash -c "cd /opt/tak/certs && ./makeCert.sh server ${HOSTNAME}"
@@ -845,7 +948,8 @@ executeConfiguration(){
             echo -e "${GREEN}[5/7]Creating the Client Certificate for ${HOSTNAME} Task Complete.${NC}" 2>&1 | tee -a $logfile
             docker rm -f takserver
             IFS="$oldIFS"
-            hostPort[0]='-p 8089:8089 -p 8443:8443'
+            unset hostPort
+            hostPort[0]='-p 8443:8443'
             if [ $certAEnrollment = 0 ]; then
                 hostPort[1]='-p 8446:8446'
                 echo -e "${GREEN}[6/7]Applying Certificate Auto Enrollment Configuration Task Complete.${NC}" 2>&1 | tee -a $logfile
@@ -863,6 +967,12 @@ executeConfiguration(){
             else
                 echo -e "${GREEN}[7/7]SKIP TAK Server Federation Configuration Task.${NC}" 2>&1 | tee -a $logfile
             fi
+            case $takConnectorType in
+                "SSL") hostPort[3]="-p 8089:8089";;
+                "QUIC") hostPort[3]="-p 8090:8090/udp";;
+                "SSL QUIC") hostPort[3]="-p 8089:8089 -p 8090:8090/udp";;
+            esac
+            unset hostPorts
             hostPorts="${hostPort[*]}"
             rm $dir/CoreConfig.{xml,xml.backup}
             docker run -it -v $dir:/opt/tak:z $hostPorts --network $dockerNet --name takserver -d takserver
@@ -870,7 +980,7 @@ executeConfiguration(){
             echo -e "${YELLOW}Please Wait...${NC}"
             docker exec takserver bash -c "cd /opt/tak/logs && touch takserver-messaging.log"
             ( tail -f -n0 $dir/logs/takserver-messaging.log & ) | grep -q "Started TAK Server messaging Microservice"
-            if [[ $@ = *-fips* ]]; then
+            if [[ $fips == "true" ]]; then
                 docker exec takserver bash -c "cd /opt/tak/certs && ./makeCert.sh client webadmin --fips"
             else
                 docker exec takserver bash -c "cd /opt/tak/certs && ./makeCert.sh client webadmin"
@@ -880,7 +990,7 @@ executeConfiguration(){
             if [ $certAEnrollment = 0 ]; then
                 create-datapackage
                 clear
-                echo -e "${GREEN}Datapackage for $serverDesc copied to $homeDir/enrollmentDP.zip${NC}" 2>&1 | tee -a $logfile
+                echo -e "${GREEN}Datapackages for $serverDesc copied to $homeDir${NC}" 2>&1 | tee -a $logfile
             else
                 clear
                 echo -e "${GREEN}TAK Server Public Certificate copied to $homeDir/caCert.p12${NC}" 2>&1 | tee -a $logfile
@@ -935,6 +1045,13 @@ installDocker(){
     docker volume create $takDB 2>&1 | tee -a $logfile
 }
 
+# Set FIPS Status
+if [[ $fips =~ -(fip) ]]; then
+        fips="true"
+else
+        fips="false"
+fi
+
 # Execute Script
 case $1 in
     *.rpm|*.deb)
@@ -956,10 +1073,14 @@ case $1 in
     *)
         echo -e "${RED}script usage:${NC} ./$(basename "$0") [TAK Server installer [rpm | deb | zip ]]\n" >&2
         echo -e "${GREEN}TAK Server Binary Installation:${NC}" >&2
-        echo -e "${YELLOW}Example:${NC} ./$(basename "$0") takserver-5.2-RELEASE43.noarch.rpm" >&2
-        echo -e "${YELLOW}Example:${NC} ./$(basename "$0") takserver-5.2-RELEASE43_ALL.deb" >&2
+        echo -e "${YELLOW}Example:${NC} ./$(basename "$0") takserver-5.3-RELEASE4.noarch.rpm" >&2
+        echo -e "${YELLOW}Example:${NC} ./$(basename "$0") takserver-5.3-RELEASE4_ALL.deb" >&2
         echo -e "\n${GREEN}TAK Server Docker Installation:${NC}" >&2
-        echo -e "${YELLOW}Example:${NC} ./$(basename "$0") takserver-docker-5.2-RELEASE-43.zip" >&2
+        echo -e "${YELLOW}Example:${NC} ./$(basename "$0") takserver-docker-5.3-RELEASE-4.zip" >&2
+        echo -e "\n${GREEN}Generate FIPS Compliant Certificates:${NC}" >&2
+        echo -e "${YELLOW}Example:${NC} ./$(basename "$0") takserver-5.3-RELEASE4.noarch.rpm --fips" >&2
+        echo -e "${YELLOW}Example:${NC} ./$(basename "$0") takserver-5.3-RELEASE4_ALL.deb --fips" >&2
+        echo -e "${YELLOW}Example:${NC} ./$(basename "$0") takserver-docker-5.3-RELEASE-4.zip --fips" >&2
         exit 1
     ;;
 esac
