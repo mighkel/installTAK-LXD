@@ -36,7 +36,7 @@ prerequisite(){
 # Determine Linux Version
     case $distro in
         rocky|rhel)
-            if ! [[ $distro_ver =~ [8] ]]; then
+            if ! [[ $distro_ver =~ [8-9] ]]; then
                 echo -e "${RED}ERR: Platform Version Unsupported.${NC}"
                 abort
             else
@@ -873,7 +873,36 @@ executeConfiguration(){
                 ( tail -f -n0 $dir/logs/takserver-messaging.log & ) | grep -q "Started TAK Server messaging Microservice"
             else
                 echo -e "${YELLOW}Please Wait...${NC}"
-                systemctl enable takserver && systemctl start takserver.service &
+                case $distro in
+                    rocky|rhel)
+                        # Temporary Fix: Apply only to Rocky/RHEL 9
+                        if [[ $distro_ver =~ [9] ]]; then
+                            tee /etc/systemd/system/takserver.service >/dev/null <<EOF
+[Unit]
+Description=TAK Server Service
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/tak
+ExecStart=/bin/bash -c './takserver-config.sh & ./takserver-messaging.sh & ./takserver-api.sh & ./takserver-plugins.sh'
+RemainAfterExit=yes
+User=tak
+Group=tak
+
+[Install]
+WantedBy=multi-user.target
+EOF
+                            systemctl enable takserver && systemctl start takserver.service &
+                        else
+                            systemctl enable takserver && systemctl start takserver.service &
+                        fi
+                    ;;
+                    *)
+                        # Apply to all other Operating Systems
+                        systemctl enable takserver && systemctl start takserver.service &
+                    ;;
+                esac
                 ( tail -f -n0 $dir/logs/takserver-messaging.log & ) | grep -q "Started TAK Server messaging Microservice"
             fi
             echo -e "${GREEN}TAK Server service STARTED.${NC}" 2>&1 | tee -a $logfile
