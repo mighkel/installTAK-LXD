@@ -10,11 +10,15 @@ A video walk-through can be found [here][walkthrough].
 ## Operating Systems Tested:
 All operating systems were tested with a minimal installation unless specifically annotated differently.
 - Rocky Linux 8
+- Rocky Linux 9
+- Red Hat Enterprise Linux (RHEL) 8 [**Not Hardened**]
+- Red Hat Enterprise Linux (RHEL) 9 [**Not Hardened**]
 - **Ubuntu Server 22 LTS**
 - **Ubuntu Server 24 LTS**
 - Docker version 24
 - PhotonOS w/ Docker Installed
-- Raspbian Desktop (64-bit) on Raspberry Pi 5 w/ 8GB RAM
+- Raspbian Desktop (64-bit) on **Raspberry Pi 5 w/ 8GB RAM**
+- Ubuntu 22/24 LTS on **Raspberry Pi 5 w/ 8GB RAM**
 
 **NOTE:** *Ubuntu Long Term Support (TLS)* versions tested only, all other versions may not work.
 
