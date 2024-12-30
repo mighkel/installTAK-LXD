@@ -969,8 +969,7 @@ EOF
                 docker exec takserver bash -c "cd /opt/tak/certs && echo y |./makeCert.sh ca $intCA"
             fi
             echo -e "${GREEN}[3/7]Creating Intermediate/Issuing Certificate Authority ${intCA} Task Complete.${NC}" 2>&1 | tee -a $logfile
-            
-            sed -i "s/truststore-root/truststore-$intCA/g" $dir/CoreConfig.xml
+            sed -i "s/truststore-root/truststore-$intCA/g" $exampleconfigxml
             echo -e "${GREEN}[4/7]Updating the CoreConfiguration Files Task Complete.${NC}" 2>&1 | tee -a $logfile
             if [[ $fips == "true" ]]; then
                 docker exec takserver bash -c "cd /opt/tak/certs && ./makeCert.sh server ${HOSTNAME} --fips"
@@ -982,6 +981,7 @@ EOF
             docker rm -f takserver
             IFS="$oldIFS"
             unset hostPort
+            unset hostPorts
             hostPort[0]='-p 8443:8443'
             if [ $certAEnrollment = 0 ]; then
                 hostPort[1]='-p 8446:8446'
@@ -1001,16 +1001,16 @@ EOF
                 echo -e "${GREEN}[7/7]SKIP TAK Server Federation Configuration Task.${NC}" 2>&1 | tee -a $logfile
             fi
             case $takConnectorType in
-                "SSL") hostPort[3]="-p 8089:8089";;
+                "SSL") hostPort[3]='-p 8089:8089';;
                 "QUIC") sed -i "7i <input _name=\"quic\" protocol=\"quic\" port=\"8090\" coreVersion=\"2\"/>" $exampleconfigxml
-                hostPort[3]="-p 8090:8090/udp";;
+                hostPort[3]='-p 8090:8090/udp';;
                 "SSL QUIC") sed -i "7i <input _name=\"quic\" protocol=\"quic\" port=\"8090\" coreVersion=\"2\"/>" $exampleconfigxml
-                hostPort[3]="-p 8089:8089 -p 8090:8090/udp";;
+                hostPort[3]='-p 8089:8089 -p 8090:8090/udp';;
             esac
-            unset hostPorts
             hostPorts="${hostPort[*]}"
             rm $dir/CoreConfig.{xml,xml.backup}
-            docker run -it -v $dir:/opt/tak:z $hostPorts --network $dockerNet --name takserver -d takserver
+            docker_command="docker run -it -v $dir:/opt/tak:z $hostPorts --network $dockerNet --name takserver -d takserver"
+            eval $docker_command
             echo -e "${YELLOW}Configuring TAK Server for final run.${NC}"
             echo -e "${YELLOW}Please Wait...${NC}"
             docker exec takserver bash -c "cd /opt/tak/logs && touch takserver-messaging.log"
