@@ -951,7 +951,8 @@ EOF
             docker build -t takserver -f docker/Dockerfile.takserver . 2>&1 | tee -a $logfile
             echo -e "${GREEN}Containers successfully deployed.${NC}" 2>&1 | tee -a $logfile
             docker run --mount source=$takDB,destination=/var/lib/postgresql -v $dir:/opt/tak:z -it -p 5432:5432 --network $dockerNet --network-alias tak-database --name takserver-db -d takserver_db
-            cd ${homeDir}/${dockerTAK}
+            cd $homeDir
+            cd "${dockerTAK%????}"
             docker run -it -v $dir:/opt/tak:z --network $dockerNet --name takserver -d takserver
             echo -e "${YELLOW}Configuring TAK Server for first run.${NC}"
             echo -e "${YELLOW}Please Wait...${NC}"
@@ -1039,8 +1040,7 @@ EOF
 # Begin Docker Installation
 #::::::::::
 installDocker(){
-    dockerTAK=$(basename "$1")
-    dockerTAK="${dockerTAK%.*}"
+    dockerTAK=$1
     status=$(systemctl is-active docker) && echo -e "$status" &>> $logfile
     if [ $status == "inactive" ]; then
         echo -e "${RED}Docker service is not started.${NC}" 2>&1 | tee -a $logfile
@@ -1067,7 +1067,8 @@ installDocker(){
     echo -e "${YELLOW}Extracting $dockerTAK.${NC}" 2>&1 | tee -a $logfile
     unzip $1 -d $homeDir 2>&1 | tee -a $logfile
     echo -e "${GREEN}Extraction of $dockerTAK Complete.${NC}" 2>&1 | tee -a $logfile
-    cd ${homeDir}/${dockerTAK}
+    cd $homeDir
+    cd "${dockerTAK%????}"
     dir=${PWD}/tak
 #Create Network
     dockerNet="takserver"
