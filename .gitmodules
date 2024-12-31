@@ -1,3 +1,5 @@
 [submodule "tak-server-systemd"]
 	path = tak-server-systemd
 	url = https://github.com/talentedbrute/tak-server-systemd
+[submodule]
+	tak-server-systemd = main
