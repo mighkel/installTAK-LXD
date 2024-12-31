@@ -50,7 +50,9 @@ prerequisite(){
             fi
         ;;
         ubuntu)
-            if ! [[ $distro_ver =~ 2[2|4].10 ]]; then
+            # Determine if Ubuntu Version is LTS
+            distro_ver=$(awk -F'=' '/^VERSION=/ { print tolower($2) }' /etc/*-release | tr -d '"')
+            if ! [[ $distro_ver =~ lts ]]; then
                 echo -e "${RED}ERR: Platform Version Unsupported.${NC}"
                 abort
             else
