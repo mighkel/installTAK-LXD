@@ -1,9 +1,9 @@
 #!/bin/bash
-#Version 1.3
+#Version 1.5
 #JR@myTeckNet
 #globalVariables
 fips=${2:-false}
-sVER="1.3 Alpha Release"
+sVER="1.5 Release Candidate (RC)"
 logfile="/tmp/.takinstall.log"
 RED='\033[0;31m'
 YELLOW='\033[0;33m'
@@ -245,11 +245,34 @@ splash(){
 
 # Certificate Properties
 set-certproperties(){
-    Country=${certconfig[0]}
-    State=${certconfig[1]}
-    City=${certconfig[2]}
-    Organization=${certconfig[3]}
-    Organizational_Unit=${certconfig[4]}
+    public_IP=$(curl https://api.ipify.org)
+    public_geoIP=$(curl http://ip-api.com/line/$public_IP?fields=8218)
+    IFS=$'\n' read -r -d '' -a geoIPInfo < <(echo "$public_geoIP" | sed 's/ \([A-Za-z]*:\) /\n\1 /g')
+    if ! [[ ${certconfig[0]} ]]; then
+        Country=${geoIPInfo[0]}
+    else
+        Country=${certconfig[0]}
+    fi
+    if ! [[ ${certconfig[1]} ]]; then
+        State=${geoIPInfo[1]}
+    else
+        State=${certconfig[1]}
+    fi
+    if ! [[ ${certconfig[2]} ]]; then
+        City=${geoIPInfo[2]}
+    else
+        City=${certconfig[2]}
+    fi
+    if ! [[ ${certconfig[3]} ]]; then
+        Organization="TAK"
+    else
+        Organization=${certconfig[3]}
+    fi
+    if ! [[ ${certconfig[4]} ]]; then
+        Organizational_Unit="TAK"
+    else
+        Organizational_Unit=${certconfig[4]}
+    fi
     oldIFS="$IFS"
     IFS=$'\n'
     exec 3>&1
@@ -738,9 +761,16 @@ create-datapackage() {
         if [ $optFQDN = 0 ]; then
             enableFQDN
         else
+            resolve_dns=$(curl https://api.hackertarget.com/reversedns/?q=$public_IP)
+            IFS=' ' read -r -a resolveDNS <<< "$resolve_dns"
+            if ! [[ ${resolveDNS[1]} ]]; then
+                FQDName=${resolveDNS[1]}
+            else
+                FQDName=$public_IP
+            fi
             serverEndPoint=($(dialog --clear --no-cancel --backtitle "$backTitle" --title "TAK Server Fully Qualified Domain Name (FQDN) Connection" --ok-label "Create DataPackage" \
                 --inputbox "Enter the FQDN of this TAK Server connection; otherwise, enter the TAK Server Public IP Address." \
-                0 0 "$serverIP" 2>&1 1>&3))
+                0 0 "$FQDName" 2>&1 1>&3))
         fi
     else
         serverEndPoint=$serverIP
@@ -1091,20 +1121,30 @@ fi
 # Execute Script
 case $1 in
     *.rpm|*.deb)
-        # Determine if the user is root; else use sudo
-        [ "$UID" -eq 0 ] || exec sudo "$0" "$@"
-        # Conduct Prerequisite Checks
-        prerequisite $1
-        type="OS"
-        Install $1
-        takWizard
+        if [[ -f "$1" ]]; then
+            # Determine if the user is root; else use sudo
+            [ "$UID" -eq 0 ] || exec sudo "$0" "$@"
+            # Conduct Prerequisite Checks
+            prerequisite $1
+            type="OS"
+            Install $1
+            takWizard
+        else
+            echo -e "${RED}File not found.${NC}"
+            abort
+        fi
     ;;
     *.zip)
-        # Determine if the user is root; else use sudo
-        [ "$UID" -eq 0 ] || exec sudo "$0" "$@"
-        type="Container"
-        installDocker $1
-        takWizard
+        if [[ -f "$1" ]]; then  
+            # Determine if the user is root; else use sudo
+            [ "$UID" -eq 0 ] || exec sudo "$0" "$@"
+            type="Container"
+            installDocker $1
+            takWizard
+        else
+            echo -e "${RED}File not found.${NC}"
+            abort
+        fi
     ;;
     *)
         echo -e "${RED}script usage:${NC} ./$(basename "$0") [TAK Server installer [rpm | deb | zip ]]\n" >&2
