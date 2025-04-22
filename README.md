@@ -7,6 +7,8 @@ Using the [TAK Server installation binaries or Docker images][takserver] provide
 
 A video walk-through can be found [here][walkthrough].
 
+**Federation Hub** instructions can be found [here](#federation-hub)
+
 ## Operating Systems Tested:
 All operating systems were tested with a minimal installation unless specifically annotated differently.
 - Rocky Linux 8
@@ -25,7 +27,7 @@ All operating systems were tested with a minimal installation unless specificall
 # Installation
 To install the `installTAK` script from the source use the following commands to install the repository to a folder of your choice:
 ```shell
-git clone https://github.com/myTeckNetCode/installTAK.git ./installTAK --recurse-submodules
+git clone https://github.com/myTeckNetCode/installTAK.git ./installTAK
 ```
 The above command will install the installTAK script in the current directory in a new folder called *installTAK*.  After the repository has been cloned navigate to the *installTAK* directory.
 ```
@@ -50,20 +52,15 @@ To enable **FIPS** Certificates append *--fips* at the end of the command.  Cust
 ```
 
 ## Installation from Download ZIP
-Installation from ZIP requires external repository contents.  Download the **installTAK.zip** and then download the **tak-server-systemd.zip** from [here](https://github.com/talentedbrute/tak-server-systemd).
+Installation from ZIP requires external repository contents.  Download the **installTAK.zip**.
 
 1. Extract the installTAK.zip
-2. Extract tak-server-systemd.zip into the installTAK directory created
 
 Final directory tree should look like this:
 ```
 installTAK
 ├───lib
 │   └───img
-└───tak-server-systemd
-    └───etc
-        └───systemd
-            └───system
 ```
 ## Installation Command Examples:
 script usage: installTAK [path to TAK Server installer [rpm | deb | zip ]]
@@ -117,6 +114,10 @@ By default the TAK Server accepts connections over **SSL/TLS**.  Additionally, t
 
 ![TAK Connection Types](lib/img/connector_wizard01.png "TAK Server Connection Types")
 
+When certificate enrollment is enabled it opens credentialed access via the API on TCP port `8446`.  The practice of poor passwords and complexity could open this as a potential attack vector for administrative access.  Select the options that are required for your deployment.  Otherwise, selecting none will only allow certificate requests and not access to WebTAK features.
+
+![WebTAK Security Options](lib/img/webtak_options01.png "WebTAK Security Options")
+
 The following prompt provides the configuration summary.  Review this prompt for accuracy, select **Confirm** to commit all changes or select **Reset Wizard** to run through the TAK Wizard again.
 
 ![TAK Wizard Prompt 08](lib/img/takwizard_prompt08.png "Configuration Summary")
@@ -160,6 +161,26 @@ After successful installation the local *installTAK* repo will delete itself sin
     - Yes: enrollmentDP.zip
     - No: caCert.p12
 - webadmin.p12
+
+# Federation-Hub
+The TAK Server Federation Hub enables forwarding of federated TAK data in a multi-hop setup. The hub supports centralized management of federation 
+configuration using a hub and spoke topology. Instead of TAK server federates connecting to each other directly, they connect to a Federation Hub. The 
+hub performs connection and trust management, and brokers federated data according to a policy defined by an administrator.  The TAK Server Federation Hub software can be installed and run independently of TAK Server.
+
+## Installation
+The `installTAK` script will detect the operating system it is being run against to determine the prerequisites needed to install the TAK Server Federation Hub.  After the prerequisites have been installed, it will install the federation-hub binary or container.  Following a complete installation or deployment of the TAK Server Federation Hub or container the TAK Server Federation Hub wizard will run to complete the remaining steps.
+
+At the following prompt, select the Federation version you wish to support to establish federated connections.  Use the space bar to toggle between on or off.  Selecting Version 2 will open TCP port `9102` and selecting Version 1 will open TCP port `9101` respectively.  Enable the appropriate version to match your federated ecosystem.
+
+![TAK Federation Hub Wizard Prompt 06](lib/img/takfedwizard01.png "Federation Hub Federation Version Support")
+
+Additionally, the TAK Server Federation Hub supports JSON Web Token (JWT) to establish an authenticated federation rather than the mutual client authentication with certificates.  Selecting *Yes* will enable Federation Token Authentication and open TCP port `9103`.  Otherwise, selecting *No* will disable this feature.
+
+![TAK Federation Hub Wizard Prompt 07](lib/img/takfedwizard02.png "Federation Hub Token Federated Support")
+
+The following prompt provides the configuration summary.  Review this prompt for accuracy, select **Confirm** to commit all changes or select **Reset Wizard** to run through the TAK Wizard again.
+
+![TAK Federation Hub Wizard Prompt 08](lib/img/takfedwizard03.png "Federation Hub Configuration Summary")
 
 # Post Installation Tasks
 Following the execution of the `installTAK` the **webadmin.p12** is created by default.  This is the TAK Server administrator certificate used to administer the TAK Server from the browser.  This file needs to be copied from the TAK Server to your local workstation.  Most modern operating systems come with secure shell (ssh) installed by default.  If you don't feel comfortable with the command line interface (CLI) tools like [WinSCP](https://winscp.net/eng/index.php) are available.
