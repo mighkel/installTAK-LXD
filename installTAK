@@ -228,7 +228,7 @@ Install(){
             dnf install dialog zip unzip -y 2>&1 | tee -a $logfile
         ;;
         ubuntu|debian)
-            apt install dialog zip unzip uuidgen -y 2>&1 | tee -a $logfile
+            apt install dialog zip unzip uuid-runtime -y 2>&1 | tee -a $logfile
         ;;
     esac
     echo -e "${GREEN}[8/8] Dependency Installation Task Complete.${NC}" 2>&1 | tee -a $logfile
