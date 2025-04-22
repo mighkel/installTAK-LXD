@@ -1678,7 +1678,7 @@ case $1 in
                                     echo -e "${GREEN}TAK Server service STOPPED.${NC}"
                                 fi
                                 apt remove takserver postgresql* -y 2>&1 | tee -a $logfile
-                                rm -rf /var/lib/pgsql 
+                                rm -rf /var/lib/pgsql
                                 if ! [[ $(dpkg -l | grep -wi 'takserver-fed-hub.noarch') ]]; then
                                     groupdel -f tak && rm -rf /opt/tak
                                 fi
