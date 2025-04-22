@@ -3,6 +3,10 @@
 
 I found this site as my guide: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) , and will attempt to follow this: [Semantic Versioning](https://semver.org/).
 
+## [2.0.1] - 21APR2025
+### Fixed 🛠️ <!--  bug fixes -->
+- Fixed uuidgen Ubuntu dependencies.
+
 ## [2.0.0] - 21APR2025
 ### Added ➕ <!-- new features -->
 - CHANGELOG to identify changes made to the project
