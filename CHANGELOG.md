@@ -3,6 +3,18 @@
 
 I found this site as my guide: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) , and will attempt to follow this: [Semantic Versioning](https://semver.org/).
 
+## [2.0.2] - 18MAY2025
+### Changed 🔃 <!-- changes in existing functionality -->
+- Updated MongoDB reference to v8.0
+- Changed webadmin cert for TAK Server Federation Hub to webadmin-hub to ensure that the admin cert is not overwritten if TAK Server and FedHub are installed on the same system
+- ### Depreciated 📦 <!-- soon-to-be removed features -->
+- [Debian] Removed gnupg and updated to gnupg2
+- [Debian] Removed MongoDB 7.0 References
+### Fixed 🛠️ <!--  bug fixes -->
+- Firewall does not apply QUIC settings when installing TAK Server 5.4
+- [Debian] TAK Server already installed being bypassed because of copy-paste error
+- [Docker] Fixed federation cert not being copied after installation
+
 ## [2.0.1] - 21APR2025
 ### Fixed 🛠️ <!--  bug fixes -->
 - Fixed uuidgen Ubuntu dependencies.

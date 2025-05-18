@@ -77,12 +77,17 @@ prerequisite(){
                         abort
                     else
                         # Execute the Ubuntu/Debian Tasks
-                        apt install debsig-verify -y 2>&1 | tee -a $logfile
+                        if ! [[ $(apt list --installed | grep -wi 'debsig-verify') ]]; then
+                            apt-get install debsig-verify -y 2>&1 | tee -a $logfile
+                        fi
                         debPolicyID=$(grep -o 'id="[^"]\+"' "${debPol}" | head -1 | tr -d 'id="')
-                        mkdir -p "/usr/share/debsig/keyrings/${debPolicyID}"
-                        mkdir -p "/etc/debsig/policies/${debPolicyID}"
+                        rm -Rf "/usr/share/debsig/keyrings/${debPolicyID}" && mkdir -p "/usr/share/debsig/keyrings/${debPolicyID}"
+                        rm -Rf "/etc/debsig/policies/${debPolicyID}" && mkdir -p "/etc/debsig/policies/${debPolicyID}"
                         touch /usr/share/debsig/keyrings/${debPolicyID}/debsig.gpg
-                        gpg --no-default-keyring --keyring /usr/share/debsig/keyrings/${debPolicyID}/debsig.gpg --import ${gpgKEY}
+                        if ! [[ $(apt list --installed | grep -wi 'gnupg2') ]]; then
+                            apt-get install -y gnupg2 2>&1 | tee -a $logfile
+                        fi
+                        gpg2 --no-default-keyring --keyring /usr/share/debsig/keyrings/${debPolicyID}/debsig.gpg --import ${gpgKEY}
                         cp ${debPol} /etc/debsig/policies/${debPolicyID}/debsig.pol
                         verify_deb=$(debsig-verify $1 | grep -Eo 'Verified')
                         if [[ $verify_deb == "Verified" ]]; then
@@ -166,7 +171,7 @@ Install(){
             echo -e "${GREEN}[4/8] PostgreSQL and PostGIS Task Complete.${NC}" 2>&1 | tee -a $logfile
         ;;
         ubuntu|debian)
-            apt install curl ca-certificates -y 2>&1 | tee -a $logfile
+            apt-get install curl ca-certificates -y 2>&1 | tee -a $logfile
             install -d /usr/share/postgresql-common/pgdg
             curl -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc --fail https://www.postgresql.org/media/keys/ACCC4CF8.asc
             sudo sh -c 'echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list'
@@ -182,7 +187,7 @@ Install(){
             dnf install java-17-openjdk-devel -y 2>&1 | tee -a $logfile
         ;;
         ubuntu|debian)
-            apt install openjdk-17-jre -y 2>&1 | tee -a $logfile
+            apt-get install openjdk-17-jre -y 2>&1 | tee -a $logfile
         ;;
     esac
     echo -e "${GREEN}[5/8] Java-OpenJDK Task Complete.${NC}" 2>&1 | tee -a $logfile
@@ -191,11 +196,11 @@ Install(){
     echo -e "\n# Installing $takBinary.\n" &>> $logfile
     case $distro in
         rocky|rhel)
-            dnf install $takBinary -y 2>&1 | tee -a $logfile
+            dnf install $takBinary -y --reinstall 2>&1 | tee -a $logfile
             servicePostgreSQL="postgresql-15"
         ;;
         ubuntu|debian)
-            apt install ./$takBinary -y 2>&1 | tee -a $logfile
+            apt-get install ./$takBinary -y --reinstall 2>&1 | tee -a $logfile
             servicePostgreSQL="postgresql"
         ;;
     esac
@@ -228,9 +233,10 @@ Install(){
             dnf install dialog zip unzip -y 2>&1 | tee -a $logfile
         ;;
         ubuntu|debian)
-            apt install dialog zip unzip uuid-runtime -y 2>&1 | tee -a $logfile
+            apt-get install dialog zip unzip uuid-runtime -y 2>&1 | tee -a $logfile
         ;;
     esac
+    cp $exampleconfigxml $dir/CoreConfig.example.xml.bak
     echo -e "${GREEN}[8/8] Dependency Installation Task Complete.${NC}" 2>&1 | tee -a $logfile
 }
 fedhubInstall(){
@@ -246,7 +252,7 @@ fedhubInstall(){
             dnf install java-17-openjdk-devel -y 2>&1 | tee -a $logfile
         ;;
         ubuntu|debian)
-            apt install openjdk-17-jre -y 2>&1 | tee -a $logfile
+            apt-get install openjdk-17-jre -y 2>&1 | tee -a $logfile
         ;;
     esac
     echo -e "${GREEN}[1/5] Java-OpenJDK Task Complete.${NC}" 2>&1 | tee -a $logfile
@@ -258,7 +264,7 @@ fedhubInstall(){
             dnf install $fedhubBinary -y 2>&1 | tee -a $logfile
         ;;
         ubuntu|debian)
-            apt install ./$fedhubBinary -y 2>&1 | tee -a $logfile
+            apt-get install ./$fedhubBinary -y 2>&1 | tee -a $logfile
         ;;
     esac
     # Check TAK Server installation
@@ -273,21 +279,28 @@ fedhubInstall(){
         ;;
         ubuntu|debian)
             distro_codename=$(awk -F'=' '/^VERSION_CODENAME=/ { print tolower($2) }' /etc/*-release | tr -d '"')
-            curl -fsSL https://www.mongodb.org/static/pgp/server-7.0.asc | gpg -o /usr/share/keyrings/mongodb-server-7.0.gpg --dearmor
+            # Delete the previous 7.0 if it exists
+            if [[ -f '/etc/apt/sources.list.d/mongodb-org-7.0.list' ]]; then
+                rm -v /etc/apt/sources.list.d/mongodb-org-7.0.list
+            fi
+            if [[ -f '/usr/share/keyrings/mongodb-server-8.0.gpg' ]]; then
+                rm -v /usr/share/keyrings/mongodb-server-8.0.gpg
+            fi
+            curl -fsSL https://www.mongodb.org/static/pgp/server-8.0.asc | gpg2 -o /usr/share/keyrings/mongodb-server-8.0.gpg --dearmor
             case $distro_ver in
                 22.*)
-                    echo "deb [ arch=amd64,arm64 signed-by=/usr/share/keyrings/mongodb-server-7.0.gpg ] https://repo.mongodb.org/apt/ubuntu $distro_codename/mongodb-org/7.0 multiverse" | tee /etc/apt/sources.list.d/mongodb-org-7.0.list
+                    echo "deb [ arch=amd64,arm64 signed-by=/usr/share/keyrings/mongodb-server-8.0.gpg ] https://repo.mongodb.org/apt/ubuntu $distro_codename/mongodb-org/8.0 multiverse" | tee /etc/apt/sources.list.d/mongodb-org-8.0.list
                 ;;
                 24.*)
-                    echo "deb [ arch=amd64,arm64 signed-by=/usr/share/keyrings/mongodb-server-7.0.gpg ] https://repo.mongodb.org/apt/ubuntu $distro_codename/mongodb-org/7.0 multiverse" | tee /etc/apt/sources.list.d/mongodb-org-7.0.list
+                    echo "deb [ arch=amd64,arm64 signed-by=/usr/share/keyrings/mongodb-server-8.0.gpg ] https://repo.mongodb.org/apt/ubuntu $distro_codename/mongodb-org/8.0 multiverse" | tee /etc/apt/sources.list.d/mongodb-org-8.0.list
                 ;;
             esac
-            apt update -y && apt install -y mongodb-org 2>&1 | tee -a $logfile
+            apt update -y && apt-get install -y mongodb-org 2>&1 | tee -a $logfile
         ;;
     esac
     case $distro in
         rocky|rhel)
-            if [[ $(dnf list installed | grep mongodb-org) ]]; then
+            if [[ $(dnf list installed | grep -wi 'mongodb-org' ) ]]; then
                 echo -e "${GREEN}[3/5] Installing MongoDB Task Complete.${NC}" 2>&1 | tee -a $logfile
             else
                 echo -e "${RED}[3/8] Installation of $takBinary Task, MongoDB Service not found.${NC}" 2>&1 | tee -a $logfile
@@ -296,7 +309,7 @@ fedhubInstall(){
             fi
         ;;
         ubuntu|debian)
-            if [[ $(dpkg -l  | grep mongodb-org) ]]; then
+            if [[ $(dpkg -l | grep -wi 'mongodb-org' ) ]]; then
                 echo -e "${GREEN}[3/5] Installing MongoDB Task Complete.${NC}" 2>&1 | tee -a $logfile
             else
                 echo -e "${RED}[3/8] Installation of $takBinary Task, MongoDB Service not found.${NC}" 2>&1 | tee -a $logfile
@@ -326,7 +339,7 @@ fedhubInstall(){
             dnf install dialog zip unzip -y 2>&1 | tee -a $logfile
         ;;
         ubuntu|debian)
-            apt install dialog zip unzip -y 2>&1 | tee -a $logfile
+            apt-get install dialog zip unzip -y 2>&1 | tee -a $logfile
         ;;
     esac
     echo -e "${GREEN}[5/5] Dependency Installation Task Complete.${NC}" 2>&1 | tee -a $logfile
@@ -557,7 +570,7 @@ apply-certautoenroll() {
                 firewall-cmd --reload >/dev/null
             ;;
             ubuntu|debian)
-                apt install ufw -y 2>&1 | tee -a $logfile
+                apt-get install ufw -y 2>&1 | tee -a $logfile
                 # Initial Firewall Rules
                 ufw default deny incoming
                 ufw default allow outgoing
@@ -1113,16 +1126,28 @@ create-webadmin(){
     echo -e "\n# Creating Admin Certificate.\n" &>> $logfile
     cd $dir/certs || exit
     if [[ $fips == "true" ]]; then
-        echo y | $makeCert client webadmin --fips
+        if [[ $fedhub == "true" ]]; then
+            echo y | $makeCert client webadmin-fed --fips
+        else
+            echo y | $makeCert client webadmin --fips
+        fi
     else
-        echo y | $makeCert client webadmin
+        if [[ $fedhub == "true" ]]; then
+            echo y | $makeCert client webadmin-fed
+        else
+            echo y | $makeCert client webadmin
+        fi
     fi
     if [[ $fedhub == "true" ]]; then 
-        java -jar $dir/jars/federation-hub-manager.jar $certs/webadmin.pem
+        java -jar $dir/jars/federation-hub-manager.jar $certs/webadmin-fed.pem
     else
         java -jar $dir/utils/UserManager.jar certmod -A $certs/webadmin.pem
     fi
-    cp $certs/webadmin.p12 $homeDir/
+    if [[ $fedhub == "true" ]]; then
+        cp $certs/webadmin-fed.p12 $homeDir/
+    else
+        cp $certs/webadmin.p12 $homeDir/
+    fi
     chown -R "$curuser":"$curuser" $homeDir
     chown -R tak:tak $dir
     echo -e "${GREEN}Creating Admin Certificate Task Complete.${NC}" 2>&1 | tee -a $logfile
@@ -1150,6 +1175,17 @@ takWizard(){
             set-takConnector
         else
             takConnectorType="SSL" # TAK Server 5.4 enables QUIC by default
+            # Apply the firewall rules for QUIC
+            case $distro in
+                rocky|rhel)
+                    firewall-cmd --zone=public --add-port 8089/tcp --add-port 8090/udp --permanent >/dev/null
+                    firewall-cmd --reload >/dev/null
+                ;;
+                ubuntu|debian)
+                    ufw allow 8089 >/dev/null
+                    ufw allow 8090/udp >/dev/null
+                ;;
+            esac
             connectorPort2="8090:quic" # Create the QUIC DP by default
         fi
     fi
@@ -1229,11 +1265,9 @@ executeConfiguration(){
                         ufw enable >/dev/null
                     ;;
                 esac
-                cp $certs/ca.pem $homeDir/caCert.pem
                 chown -R "$curuser":"$curuser" $homeDir
                 usermod -aG tak $curuser
                 clear
-                echo -e "${GREEN}TAK Server Federation Hub Public Certificate copied to $homeDir/caCert.pem${NC}" 2>&1 | tee -a $logfile
             else
                 apply-certautoenroll
                 apply-takfederation
@@ -1280,10 +1314,24 @@ executeConfiguration(){
                     echo -e "${GREEN}TAK Server Public Certificate copied to $homeDir/caCert.p12${NC}" 2>&1 | tee -a $logfile
                 fi
             fi
-            echo -e "Web Admin Certificate copied to ${GREEN}$homeDir/webadmin.p12${NC}" 2>&1 | tee -a $logfile
+            if [[ $fedhub == "true" ]]; then
+                cp $certs/ca.pem $homeDir/FedHubCA.pem
+            else
+                cp $certs/ca.pem $homeDir/FedCA.pem
+            fi
+            if [[ $fedhub == "true" ]]; then
+                echo -e "${GREEN}TAK Server Federation Hub Public Certificate copied to $homeDir/FedHubCA.pem${NC}" 2>&1 | tee -a $logfile
+            else
+                echo -e "${GREEN}TAK Server Federation Hub Public Certificate copied to $homeDir/FedCA.pem${NC}" 2>&1 | tee -a $logfile
+            fi
+            if [[ $fedhub == "true" ]]; then
+                echo -e "Web Admin Certificate copied to ${GREEN}$homeDir/webadmin-fed.p12${NC}" 2>&1 | tee -a $logfile
+            else
+                echo -e "Web Admin Certificate copied to ${GREEN}$homeDir/webadmin.p12${NC}" 2>&1 | tee -a $logfile
+            fi
             if [[ $fedhub == "true" ]]; then
                 serverIP=$(ip addr show $(ip route | awk '/default/ { print $5 }') | grep "inet" | head -n 1 | awk '/inet/ {print $2}' | cut -d'/' -f1)
-                echo -e "Import the ${GREEN}webadmin.p12${NC} then navigate to the Federation Hub UI: ${GREEN}https://$serverIP:9100${NC}" 2>&1 | tee -a $logfile
+                echo -e "Import the ${GREEN}webadmin-fed.p12${NC} then navigate to the Federation Hub UI: ${GREEN}https://$serverIP:9100${NC}" 2>&1 | tee -a $logfile
             else
                 echo -e "Import the ${GREEN}webadmin.p12${NC} then navigate to the TAK Server UI: ${GREEN}https://$serverIP:8443${NC}" 2>&1 | tee -a $logfile
             fi
@@ -1373,7 +1421,7 @@ executeConfiguration(){
             if [[ $fedhub == "true" ]]; then
                 sed -i "s/takserver.jks/${HOSTNAME}.jks/g" $fedUIyml
                 sed -i "s/takserver.jks/${HOSTNAME}.jks/g" $fedBrokeryml
-                sed -i "s/keyAlias\: takserver/keyAlias: ${HOSTNAME}/g" $fedUIyml
+                sed -i "s/keyAlias\: takserver/keyAlias\: ${HOSTNAME}/g" $fedUIyml
             else
                 sed -i "s/takserver.jks/${HOSTNAME}.jks/g" $exampleconfigxml
             fi
@@ -1457,24 +1505,33 @@ executeConfiguration(){
             # Create Webadmin Certificate
             if [[ $fips == "true" ]]; then
                 if [[ $fedhub == "true" ]]; then
-                    docker exec fedhub bash -c "cd /opt/tak/federation-hub/certs && ./makeCert.sh client webadmin --fips"
+                    docker exec fedhub bash -c "cd /opt/tak/federation-hub/certs && ./makeCert.sh client webadmin-fed --fips"
                 else
                     docker exec takserver bash -c "cd /opt/tak/certs && ./makeCert.sh client webadmin --fips"
                 fi
             else
                 if [[ $fedhub == "true" ]]; then
-                    docker exec fedhub bash -c "cd /opt/tak/federation-hub/certs && ./makeCert.sh client webadmin --fips"
+                    docker exec fedhub bash -c "cd /opt/tak/federation-hub/certs && ./makeCert.sh client webadmin-fed --fips"
                 else
                     docker exec takserver bash -c "cd /opt/tak/certs && ./makeCert.sh client webadmin"
                 fi
             fi
             if [[ $fedhub == "true" ]]; then
-                docker exec fedhub bash -c "java -jar /opt/tak/federation-hub/jars/federation-hub-manager.jar /opt/tak/federation-hub/certs/files/webadmin.pem"
+                docker exec fedhub bash -c "java -jar /opt/tak/federation-hub/jars/federation-hub-manager.jar /opt/tak/federation-hub/certs/files/webadmin-fed.pem"
                 clear
             else
                 docker exec takserver bash -c "java -jar /opt/tak/utils/UserManager.jar certmod -A /opt/tak/certs/files/webadmin.pem"
             fi
+            if [[ $fedhub == "true" ]]; then
+                cp $certs/ca.pem $homeDir/FedHubCA.pem
+            else
+                cp $certs/ca.pem $homeDir/FedCA.pem
+            fi
+            if [[ $fedhub == "true" ]]; then
+                cp $certs/webadmin-fed.p12 $homeDir/
+            else
                 cp $certs/webadmin.p12 $homeDir/
+            fi
             if ! [[ $fedhub == "true" ]]; then
                 if [ $certAEnrollment = 0 ]; then
                     create-datapackage
@@ -1485,10 +1542,19 @@ executeConfiguration(){
                     echo -e "TAK Server Public Certificate copied to ${GREEN}$homeDir/caCert.p12${NC}" 2>&1 | tee -a $logfile
                 fi
             fi
-            echo -e "Web Admin Certificate copied to ${GREEN}$homeDir/webadmin.p12${NC}" 2>&1 | tee -a $logfile
+            if [[ $fedhub == "true" ]]; then
+                echo -e "${GREEN}TAK Server Federation Hub Public Certificate copied to $homeDir/FedHubCA.pem${NC}" 2>&1 | tee -a $logfile
+            else
+                echo -e "${GREEN}TAK Server Federation Hub Public Certificate copied to $homeDir/FedCA.pem${NC}" 2>&1 | tee -a $logfile
+            fi
+            if [[ $fedhub == "true" ]]; then
+                echo -e "Web Admin Certificate copied to ${GREEN}$homeDir/webadmin-fed.p12${NC}" 2>&1 | tee -a $logfile
+            else
+                echo -e "Web Admin Certificate copied to ${GREEN}$homeDir/webadmin.p12${NC}" 2>&1 | tee -a $logfile
+            fi
             if [[ $fedhub == "true" ]]; then
                 serverIP=$(ip addr show $(ip route | awk '/default/ { print $5 }') | grep "inet" | head -n 1 | awk '/inet/ {print $2}' | cut -d'/' -f1)
-                echo -e "Import the ${GREEN}webadmin.p12${NC} then navigate to the Federation Hub UI: ${GREEN}https://$serverIP:9100${NC}" 2>&1 | tee -a $logfile
+                echo -e "Import the ${GREEN}webadmin-fed.p12${NC} then navigate to the Federation Hub UI: ${GREEN}https://$serverIP:9100${NC}" 2>&1 | tee -a $logfile
             else
                 echo -e "Import the ${GREEN}webadmin.p12${NC} then navigate to the TAK Server UI: ${GREEN}https://$serverIP:8443${NC}" 2>&1 | tee -a $logfile
             fi
@@ -1518,7 +1584,7 @@ installDocker(){
             dnf install unzip zip dialog -y 2>&1 | tee -a $logfile
         ;;
         ubuntu|debian)
-            apt install unzip zip dialog -y 2>&1 | tee -a $logfile
+            apt-get install unzip zip dialog -y 2>&1 | tee -a $logfile
         ;;
         photon)
             tdnf install unzip zip dialog -y 2>&1 | tee -a $logfile
@@ -1590,6 +1656,7 @@ case $1 in
                                 firewall-cmd --zone=public --remove-port 9102/tcp --permanent >/dev/null
                                 firewall-cmd --zone=public --remove-port 9103/tcp --permanent >/dev/null
                                 firewall-cmd --reload >/dev/null
+                                rm $homeDir/webadmin-fed.p12 $homeDir/FedHubCA.pem >/dev/null
                                 echo -e "${GREEN}TAK Server Federation Hub successfully removed, continuing installation.${NC}"  2>&1 | tee -a $logfile
                             else
                                 ERRoR="TAK Server Federation Hub already installed."
@@ -1598,7 +1665,7 @@ case $1 in
                         fi
                     ;;
                     ubuntu|debian)
-                        if [[ $(dpkg -l | grep -wi 'takserver-fed-hub.noarch') ]]; then
+                        if [[ $(apt list --installed | grep -wi 'takserver-fed-hub/now') ]]; then
                             echo -e "${RED}TAK Server Federation Hub already installed.${NC}" 2>&1 | tee -a $logfile
                             # Prompt to remove existing installation
                             read -p "TAK Server Federation Hub already installed, Overwrite? (y/n) " confirm
@@ -1608,9 +1675,10 @@ case $1 in
                                     systemctl stop takserver
                                     echo -e "${GREEN}TAK Server service STOPPED.${NC}"
                                 fi
-                                apt remove takserver-fed-hub mongodb* -y 2>&1 | tee -a $logfile
+                                apt-get remove takserver-fed-hub mongodb* -y 2>&1 | tee -a $logfile
                                 rm -rf /var/lib/mongodb && rm -rf /opt/tak/federation-hub
-                                if ! [[ $(dpkg -l | grep -wi 'takserver.noarch') ]]; then
+                                # Determine if takserver is installed
+                                if ! [[ $(apt list --installed | grep -wi 'takserver/now') ]]; then
                                     groupdel -f tak
                                 fi
                                 # Just delete all, even if not present
@@ -1619,6 +1687,7 @@ case $1 in
                                 ufw delete allow 8443 >/dev/null
                                 ufw delete allow 8446 >/dev/null
                                 ufw delete allow 9001 >/dev/null
+                                rm $homeDir/webadmin-fed.p12 $homeDir/FedHubCA.pem >/dev/null
                                 echo -e "${GREEN}TAK Server successfully removed, continuing installation.${NC}"  2>&1 | tee -a $
                             else
                                 ERRoR="TAK Server Federation Hub already installed."
@@ -1631,7 +1700,6 @@ case $1 in
                 fedWizard
             else
                 backTitle="TAK Server Setup Wizard - Version: $sVER"
-                prerequisite $1
                 type="OS"
                 echo -e "${GREEN}Installation Type: TAK Server${NC}" >&2 | tee -a $logfile
                 # Check if the TAK Server Federation Hub is already installed
@@ -1647,8 +1715,12 @@ case $1 in
                                     systemctl stop takserver
                                     echo -e "${GREEN}TAK Server service STOPPED.${NC}"
                                 fi
-                                dnf remove takserver postgresql* -y 2>&1 | tee -a $logfile
-                                rm -rf /var/lib/pgsql
+                                su - postgres -c "psql -U postgres -c \"DROP DATABASE cot;\"" >/dev/null
+                                su - postgres -c "psql -U postgres -c \"DROP USER martiuser;\"" >/dev/null
+                                rm -rf /var/lib/pgsql >/dev/null
+                                dnf remove takserver -y 2>&1 | tee -a $logfile
+                                rm -rf /opt/tak/certs >/dev/null
+                                # Determine if Fedhub is installed
                                 if ! [[ $(dnf list installed | grep -wi 'takserver-fed-hub.noarch') ]]; then
                                     groupdel -f tak && rm -rf /opt/tak
                                 fi
@@ -1659,6 +1731,7 @@ case $1 in
                                 firewall-cmd --zone=public --remove-port 8446/tcp --permanent >/dev/null
                                 firewall-cmd --zone=public --remove-port 9001/tcp --permanent >/dev/null
                                 firewall-cmd --reload >/dev/null
+                                rm $homeDir/webadmin.p12 $homeDir/FedCA.pem $homeDir/enrollmentDP.zip $homeDir/enrollmentDP-QUIC.zip >/dev/null
                                 echo -e "${GREEN}TAK Server successfully removed, continuing installation.${NC}"  2>&1 | tee -a $logfile
                             else
                                 ERRoR="TAK Server already installed."
@@ -1667,7 +1740,7 @@ case $1 in
                         fi
                     ;;
                     ubuntu|debian)
-                        if [[ $(dpkg -l | grep -wi 'takserver-fed-hub.noarch') ]]; then
+                        if [[ $(apt list --installed | grep -wi 'takserver/now') ]]; then
                             echo -e "${RED}TAK Server already installed.${NC}" 2>&1 | tee -a $logfile
                             # Prompt to remove existing installation
                             read -p "TAK Server already installed, Overwrite? (y/n) " confirm
@@ -1677,9 +1750,14 @@ case $1 in
                                     systemctl stop takserver
                                     echo -e "${GREEN}TAK Server service STOPPED.${NC}"
                                 fi
-                                apt remove takserver postgresql* -y 2>&1 | tee -a $logfile
-                                rm -rf /var/lib/pgsql
-                                if ! [[ $(dpkg -l | grep -wi 'takserver-fed-hub.noarch') ]]; then
+                                # Drop the Database & User
+                                su - postgres -c "psql -U postgres -c \"DROP DATABASE cot;\"" >/dev/null
+                                su - postgres -c "psql -U postgres -c \"DROP USER martiuser;\"" >/dev/null
+                                rm -rf /var/lib/pgsql >/dev/null
+                                apt-get remove takserver -y 2>&1 | tee -a $logfile
+                                rm -rf /opt/tak/certs >/dev/null
+                                # Determine if Fedhub is installed
+                                if ! [[ $(apt list --installed | grep -wi 'takserver-fed-hub/now') ]]; then
                                     groupdel -f tak && rm -rf /opt/tak
                                 fi
                                 # Just delete all, even if not present
@@ -1688,6 +1766,7 @@ case $1 in
                                 ufw delete allow 8443 >/dev/null
                                 ufw delete allow 8446 >/dev/null
                                 ufw delete allow 9001 >/dev/null
+                                rm $homeDir/webadmin.p12 $homeDir/FedCA.pem $homeDir/enrollmentDP.zip $homeDir/enrollmentDP-QUIC.zip >/dev/null
                                 echo -e "${GREEN}TAK Server successfully removed, continuing installation.${NC}"  2>&1 | tee -a $logfile
                             else
                                 ERRoR="TAK Server already installed."
@@ -1696,6 +1775,7 @@ case $1 in
                         fi
                     ;;
                 esac
+                prerequisite $1
                 Install $1
                 takWizard
             fi
