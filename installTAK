@@ -1719,6 +1719,8 @@ case $1 in
                                 rm -rf /var/lib/pgsql >/dev/null
                                 dnf remove takserver -y 2>&1 | tee -a $logfile
                                 rm -rf /opt/tak/certs >/dev/null
+                                rm -f /opt/tak/CoreConfig.{xml,xml.backup} >/dev/null
+                                rm -Rf /opt/tak/jetty* >/dev/null
                                 # Determine if Fedhub is installed
                                 if ! [[ $(dnf list installed | grep -wi 'takserver-fed-hub.noarch') ]]; then
                                     groupdel -f tak && rm -rf /opt/tak
@@ -1755,6 +1757,8 @@ case $1 in
                                 rm -rf /var/lib/pgsql >/dev/null
                                 apt-get remove takserver -y 2>&1 | tee -a $logfile
                                 rm -rf /opt/tak/certs >/dev/null
+                                rm -f /opt/tak/CoreConfig.{xml,xml.backup} >/dev/null
+                                rm -Rf /opt/tak/jetty* >/dev/null
                                 # Determine if Fedhub is installed
                                 if ! [[ $(apt list --installed | grep -wi 'takserver-fed-hub/now') ]]; then
                                     groupdel -f tak && rm -rf /opt/tak

@@ -14,6 +14,7 @@ I found this site as my guide: [Keep a Changelog](https://keepachangelog.com/en/
 - Firewall does not apply QUIC settings when installing TAK Server 5.4
 - [Debian] TAK Server already installed being bypassed because of copy-paste error
 - [Docker] Fixed federation cert not being copied after installation
+- CoreConfig regeneration on reinstallation
 
 ## [2.0.1] - 21APR2025
 ### Fixed 🛠️ <!--  bug fixes -->
