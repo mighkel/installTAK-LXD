@@ -1265,6 +1265,21 @@ executeConfiguration(){
                         ufw enable >/dev/null
                     ;;
                 esac
+                # If federation hub is installed, restart the takserver.service
+                case $distro in
+                    rocky|rhel)
+                        if [[ $(dnf list installed | grep -wi 'takserver.noarch') ]]; then
+                            systemctl restart takserver.service &
+                            ( tail -f -n0 $dir/logs/takserver-messaging.log & ) | grep -q "Started TAK Server messaging Microservice"
+                        fi
+                    ;;
+                    ubuntu|debian)
+                        if [[ $(apt list --installed | grep -wi 'takserver/now') ]]; then
+                            systemctl restart takserver.service &
+                            ( tail -f -n0 $dir/logs/takserver-messaging.log & ) | grep -q "Started TAK Server messaging Microservice"
+                        fi
+                    ;;
+                esac
                 chown -R "$curuser":"$curuser" $homeDir
                 usermod -aG tak $curuser
                 clear
