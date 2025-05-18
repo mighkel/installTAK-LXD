@@ -1682,11 +1682,10 @@ case $1 in
                                     groupdel -f tak
                                 fi
                                 # Just delete all, even if not present
-                                ufw delete allow 8089 >/dev/null
-                                ufw delete allow 8090/udp >/dev/null
-                                ufw delete allow 8443 >/dev/null
-                                ufw delete allow 8446 >/dev/null
-                                ufw delete allow 9001 >/dev/null
+                                ufw delete allow 9100 >/dev/null
+                                ufw delete allow 9101 >/dev/null
+                                ufw delete allow 9102 >/dev/null
+                                ufw delete allow 9103 >/dev/null
                                 rm $homeDir/webadmin-fed.p12 $homeDir/FedHubCA.pem >/dev/null
                                 echo -e "${GREEN}TAK Server successfully removed, continuing installation.${NC}"  2>&1 | tee -a $
                             else
