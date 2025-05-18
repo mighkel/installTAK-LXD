@@ -701,7 +701,7 @@ federationTokenAuthServers:
  - type: jwt
  - port: 9103
 EOF
-        if [[ $case == "OS" ]]; then
+        if [[ $type == "OS" ]]; then
             case $distro in
                 rocky|rhel)
                     firewall-cmd --zone=public --add-port 9103/tcp --permanent >/dev/null
