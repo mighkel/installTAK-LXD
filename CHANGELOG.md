@@ -3,6 +3,12 @@
 
 I found this site as my guide: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) , and will attempt to follow this: [Semantic Versioning](https://semver.org/).
 
+## [2.0.3] - 30MAY2025
+### Fixed 🛠️ <!--  bug fixes -->
+- [Rocky/RHEL] Fixed dnf install vs dnf reinstall not being recognized when installing on Rocky/RHEL
+- [Let's Encrypt] Fixed issue with DataPackage not having the FQDN when using Let's Encrypt
+- [Debian] When reinstalling the TAK Server the PostgreSQL directory is not deleted
+
 ## [2.0.2] - 18MAY2025
 ### Changed 🔃 <!-- changes in existing functionality -->
 - Updated MongoDB reference to v8.0

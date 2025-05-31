@@ -196,7 +196,11 @@ Install(){
     echo -e "\n# Installing $takBinary.\n" &>> $logfile
     case $distro in
         rocky|rhel)
-            dnf install $takBinary -y --reinstall 2>&1 | tee -a $logfile
+            if [[ $(dnf list installed | grep -wi 'takserver.noarch') ]]; then
+                dnf reinstall $takBinary -y 2>&1 | tee -a $logfile
+            else
+                dnf install $takBinary -y 2>&1 | tee -a $logfile
+            fi
             servicePostgreSQL="postgresql-15"
         ;;
         ubuntu|debian)
@@ -236,7 +240,7 @@ Install(){
             apt-get install dialog zip unzip uuid-runtime -y 2>&1 | tee -a $logfile
         ;;
     esac
-    cp $exampleconfigxml $dir/CoreConfig.example.xml.bak
+    cp $dir/CoreConfig.example.xml $dir/CoreConfig.example.xml.bak
     echo -e "${GREEN}[8/8] Dependency Installation Task Complete.${NC}" 2>&1 | tee -a $logfile
 }
 fedhubInstall(){
@@ -850,7 +854,8 @@ EOF
 openssl pkcs12 -export -in $LEdir/live/${certREQ[0]}/fullchain.pem -inkey $LEdir/live/${certREQ[0]}/privkey.pem -out $certs/${HOSTNAME}-le.p12 -name ${certREQ[0]} -passin pass:${CAPASSWD} -passout pass:${CAPASSWD}
 keytool -importkeystore -destkeystore $certs/${HOSTNAME}-le.jks -srckeystore $certs/${HOSTNAME}-le.p12 -srcstoretype pkcs12 -deststorepass "${CAPASSWD}" -destkeypass "${CAPASSWD}" -srcstorepass "${CAPASSWD}"
 chown -R tak:tak $dir
-systemctl restart takserver.service && ( tail -f -n0 $dir/logs/takserver-messaging.log & ) | grep -q "Started TAK Server messaging Microservice"
+systemctl restart takserver.service &
+( tail -f -n0 $dir/logs/takserver-messaging.log & ) | grep -q "Started TAK Server messaging Microservice"
 EOF
                 chmod +x $dir/renew-tak-le
                 chown -R tak:tak $dir
@@ -861,7 +866,8 @@ EOF
                     systemctl restart takserver-noplugins &
                     ( tail -f -n0 $dir/logs/takserver-messaging.log & ) | grep -q "Started TAK Server messaging Microservice"
                 else
-                    systemctl restart takserver.service && ( tail -f -n0 $dir/logs/takserver-messaging.log & ) | grep -q "Started TAK Server messaging Microservice"
+                    systemctl restart takserver.service &
+                    ( tail -f -n0 $dir/logs/takserver-messaging.log & ) | grep -q "Started TAK Server messaging Microservice"
                 fi
             ;;
             Container)
@@ -896,6 +902,7 @@ EOF
                 docker restart takserver
             ;;
         esac
+    serverEndPoint=${certREQ[0]}
     echo -e "${GREEN}Let's Encrypt Certificate Successfully applied.${NC}" 2>&1 | tee -a $logfile
     echo -e "${GREEN}Let's Encrypt Certificate Task Complete.${NC}"
 }
@@ -1246,7 +1253,7 @@ executeConfiguration(){
                         apply-fedhubToken
                         echo -e "${YELLOW}Restrating TAK Server Federation Hub.${NC}"
                     fi
-                    systemctl restart federation-hub
+                    systemctl restart federation-hub &
                     ( tail -f -n0 $dir/logs/federation-hub-ui.log & ) | grep -q "Started FederationHubUIServer"
                     echo -e "${GREEN}TAK Federation Hub service STARTED.${NC}" 2>&1 | tee -a $logfile
                 fi
@@ -1731,7 +1738,7 @@ case $1 in
                                 fi
                                 su - postgres -c "psql -U postgres -c \"DROP DATABASE cot;\"" >/dev/null
                                 su - postgres -c "psql -U postgres -c \"DROP USER martiuser;\"" >/dev/null
-                                rm -rf /var/lib/pgsql >/dev/null
+                                rm -rf /var/lib/postgresql >/dev/null
                                 dnf remove takserver -y 2>&1 | tee -a $logfile
                                 rm -rf /opt/tak/certs >/dev/null
                                 rm -f /opt/tak/CoreConfig.{xml,xml.backup} >/dev/null
