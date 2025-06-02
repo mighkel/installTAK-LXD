@@ -1738,7 +1738,7 @@ case $1 in
                                 fi
                                 su - postgres -c "psql -U postgres -c \"DROP DATABASE cot;\"" >/dev/null
                                 su - postgres -c "psql -U postgres -c \"DROP USER martiuser;\"" >/dev/null
-                                rm -rf /var/lib/postgresql >/dev/null
+                                rm -rf /var/lib/pgsql >/dev/null
                                 dnf remove takserver -y 2>&1 | tee -a $logfile
                                 rm -rf /opt/tak/certs >/dev/null
                                 rm -f /opt/tak/CoreConfig.{xml,xml.backup} >/dev/null
@@ -1776,7 +1776,7 @@ case $1 in
                                 # Drop the Database & User
                                 su - postgres -c "psql -U postgres -c \"DROP DATABASE cot;\"" >/dev/null
                                 su - postgres -c "psql -U postgres -c \"DROP USER martiuser;\"" >/dev/null
-                                rm -rf /var/lib/pgsql >/dev/null
+                                rm -rf /var/lib/postgresql >/dev/null
                                 apt-get remove takserver -y 2>&1 | tee -a $logfile
                                 rm -rf /opt/tak/certs >/dev/null
                                 rm -f /opt/tak/CoreConfig.{xml,xml.backup} >/dev/null
