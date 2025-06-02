@@ -3,7 +3,7 @@
 #JR@myTeckNet
 #globalVariables
 fips=${2:-false}
-sVER="2.0 Release Candidate (RC)"
+sVER="2.0.4"
 logfile="/tmp/.takinstall.log"
 RED='\033[0;31m'
 YELLOW='\033[0;33m'
