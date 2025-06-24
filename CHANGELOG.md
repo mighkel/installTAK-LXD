@@ -3,9 +3,13 @@
 
 I found this site as my guide: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) , and will attempt to follow this: [Semantic Versioning](https://semver.org/).
 
+## [2.0.5] - 24JUN2025
+### Updated 🔃
+- Updated README to reflect git URL change/update
+
 ## [2.0.4] - 02JUN2025
 ### Fixed 🛠️ <!--  bug fixes -->
-- [Rocky/RHEL/Debian] Corrected postgresql directory reference on removal, orignially had them reversed
+- [Rocky/RHEL/Debian] Corrected postgresql directory reference on removal, originally had them reversed
 
 ## [2.0.3] - 30MAY2025
 ### Fixed 🛠️ <!--  bug fixes -->

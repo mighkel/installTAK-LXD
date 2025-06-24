@@ -27,7 +27,7 @@ All operating systems were tested with a minimal installation unless specificall
 # Installation
 To install the `installTAK` script from the source use the following commands to install the repository to a folder of your choice:
 ```shell
-git clone https://github.com/myTeckNetCode/installTAK.git ./installTAK
+git clone https://github.com/myTeckNet/installTAK.git ./installTAK && cd ./installTAK
 ```
 The above command will install the installTAK script in the current directory in a new folder called *installTAK*.  After the repository has been cloned navigate to the *installTAK* directory.
 ```
