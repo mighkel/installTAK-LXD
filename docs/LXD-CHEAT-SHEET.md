@@ -4,6 +4,27 @@ Quick reference for common LXD container operations during TAK Server deployment
 
 ---
 
+## Quick Reference Card
+```bash
+# ESSENTIAL COMMANDS
+lxc list                              # Show all containers
+lxc exec CONTAINER -- bash            # Get shell
+lxc file push FILE CONTAINER/path/    # Upload file
+lxc file pull CONTAINER/path/ ./      # Download file
+lxc snapshot CONTAINER name           # Create backup
+lxc restore CONTAINER name            # Restore backup
+lxc stop CONTAINER                    # Stop container
+lxc start CONTAINER                   # Start container
+exit                                  # Leave container shell
+
+# FILE SHORTCUTS (from host)
+lxc exec tak -- systemctl status takserver           # Check TAK status
+lxc exec tak -- tail -f /opt/tak/logs/takserver.log # Watch logs
+lxc file pull tak/root/webadmin.p12 ~/               # Get certificate
+```
+
+---
+
 ## Container Basics
 
 ### List Containers
@@ -390,27 +411,6 @@ lxc start tak-test
 - Official LXD Docs: https://linuxcontainers.org/lxd/docs/latest/
 - LXD GitHub: https://github.com/canonical/lxd
 - Ubuntu LXD Tutorial: https://ubuntu.com/tutorials/introduction-to-lxd
-
----
-
-## Quick Reference Card
-```bash
-# ESSENTIAL COMMANDS
-lxc list                              # Show all containers
-lxc exec CONTAINER -- bash            # Get shell
-lxc file push FILE CONTAINER/path/    # Upload file
-lxc file pull CONTAINER/path/ ./      # Download file
-lxc snapshot CONTAINER name           # Create backup
-lxc restore CONTAINER name            # Restore backup
-lxc stop CONTAINER                    # Stop container
-lxc start CONTAINER                   # Start container
-exit                                  # Leave container shell
-
-# FILE SHORTCUTS (from host)
-lxc exec tak -- systemctl status takserver           # Check TAK status
-lxc exec tak -- tail -f /opt/tak/logs/takserver.log # Watch logs
-lxc file pull tak/root/webadmin.p12 ~/               # Get certificate
-```
 
 ---
 
