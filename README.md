@@ -25,6 +25,19 @@ All operating systems were tested with a minimal installation unless specificall
 **NOTE:** *Ubuntu Long Term Support (TLS)* versions tested only, all other versions may not work.
 
 # Installation
+
+## 🆕 LXD Container Support
+
+This fork includes enhanced support for LXD container deployments with automatic handling of:
+- Container networking verification
+- PostgreSQL initialization in containers  
+- Post-install verification
+- Automatic enrollment package creation
+
+**👉 [See LXD Quick Start Guide](README-LXD.md)**
+
+---
+
 To install the `installTAK` script from the source use the following commands to install the repository to a folder of your choice:
 ```shell
 git clone https://github.com/myTeckNet/installTAK.git ./installTAK && cd ./installTAK
@@ -194,3 +207,29 @@ scp takadmin@192.168.1.100:~/webadmin.p12 .
 # [Windows] This will copy the webadmin.p12 to the current user's downloads directory
 scp takadmin@192.168.1.100:~/webadmin.p12 %userprofile%\Downloads
 ```
+
+---
+
+## LXD Container Deployment
+
+Running TAK Server in an LXD container? Use the enhanced LXD mode:
+```bash
+./installTAK takserver.deb false true
+#                          ↑     ↑
+#                        FIPS  LXD-mode
+```
+
+**[Complete LXD deployment guide →](README-LXD.md)**
+
+### Key Features for LXD
+- ✅ Automatic networking verification
+- ✅ PostgreSQL container fixes
+- ✅ Post-install health checks
+- ✅ Auto-generated enrollment packages
+
+---
+
+## Credits
+
+Original script by [myTeckNet](https://github.com/myTeckNet/installTAK)  
+LXD enhancements for container deployments
