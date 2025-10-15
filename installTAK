@@ -137,6 +137,42 @@ prerequisite(){
     echo -e "${GREEN}[1/8]Prerequisite Checks Completed.${NC}" 2>&1 | tee -a $logfile
 }
 #::::::::::
+# PostgreSQL Verification for LXD Containers
+#::::::::::
+verifyPostgreSQL(){
+    if [[ $lxdMode == "true" ]]; then
+        echo -e "${YELLOW}LXD Mode: Verifying PostgreSQL initialization...${NC}" 2>&1 | tee -a $logfile
+        
+        # Wait for PostgreSQL to start
+        sleep 5
+        
+        # Check if PostgreSQL is listening
+        if ! ss -tulpn | grep -q ":5432"; then
+            echo -e "${YELLOW}PostgreSQL not listening on port 5432, attempting initialization...${NC}" 2>&1 | tee -a $logfile
+            
+            # Check if data directory exists
+            if [ ! -d "/var/lib/postgresql/15/main" ]; then
+                echo -e "${YELLOW}Creating PostgreSQL data directory...${NC}" 2>&1 | tee -a $logfile
+                mkdir -p /var/lib/postgresql/15/main
+                chown -R postgres:postgres /var/lib/postgresql
+                sudo -u postgres /usr/lib/postgresql/15/bin/initdb -D /var/lib/postgresql/15/main 2>&1 | tee -a $logfile
+            fi
+            
+            # Start PostgreSQL cluster
+            pg_ctlcluster 15 main start 2>&1 | tee -a $logfile
+            sleep 3
+            
+            # Verify it's now running
+            if ! ss -tulpn | grep -q ":5432"; then
+                ERRoR="PostgreSQL failed to start. Check logs at /var/log/postgresql/"
+                abort
+            fi
+        fi
+        
+        echo -e "${GREEN}✓ PostgreSQL verified and running${NC}" 2>&1 | tee -a $logfile
+    fi
+}
+#::::::::::
 # Begin RPM/DEB Installation
 #::::::::::
 Install(){
