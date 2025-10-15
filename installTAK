@@ -1755,6 +1755,7 @@ else
         fips="false"
 fi
 # Execute Script
+verifyContainerNetworking
 case $1 in
     *.rpm|*.deb)
         if [[ -f "$1" ]]; then
