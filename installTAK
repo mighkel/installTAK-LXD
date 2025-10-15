@@ -1654,6 +1654,49 @@ executeConfiguration(){
     esac
 }
 #::::::::::
+# Post-Install Verification for LXD Containers
+#::::::::::
+postInstallVerification(){
+    if [[ $lxdMode == "true" ]]; then
+        echo -e "${YELLOW}LXD Mode: Verifying TAK Server installation...${NC}" 2>&1 | tee -a $logfile
+        
+        # Wait for TAK to start
+        sleep 15
+        
+        # Check if takserver is running
+        if systemctl is-active --quiet takserver; then
+            echo -e "${GREEN}✓ TAK Server service is running${NC}" 2>&1 | tee -a $logfile
+            
+            # Check logs for successful startup
+            if tail -n 50 /opt/tak/logs/takserver-messaging.log | grep -q "Started TAK Server"; then
+                echo -e "${GREEN}✓ TAK Server started successfully${NC}" 2>&1 | tee -a $logfile
+            else
+                echo -e "${YELLOW}⚠ TAK Server running but startup may be incomplete${NC}" 2>&1 | tee -a $logfile
+                echo -e "${YELLOW}Check logs: tail -f /opt/tak/logs/takserver-messaging.log${NC}" 2>&1 | tee -a $logfile
+            fi
+            
+            # Create enrollment package
+            echo -e "${YELLOW}Creating default enrollment package...${NC}" 2>&1 | tee -a $logfile
+            cd /opt/tak/certs
+            ./makeCert.sh client defaultuser 2>&1 | tee -a $logfile
+            cd files
+            zip -q /root/enrollment-default.zip defaultuser.p12 truststore-root.p12
+            echo -e "${GREEN}✓ Enrollment package created: /root/enrollment-default.zip${NC}" 2>&1 | tee -a $logfile
+            
+        else
+            ERRoR="TAK Server failed to start. Check logs at /opt/tak/logs/takserver-messaging.log"
+            abort
+        fi
+        
+        echo -e "${GREEN}================================${NC}" 2>&1 | tee -a $logfile
+        echo -e "${GREEN}TAK Server Installation Complete${NC}" 2>&1 | tee -a $logfile
+        echo -e "${GREEN}================================${NC}" 2>&1 | tee -a $logfile
+        echo -e "Web Admin: https://\$(hostname -f):8443" 2>&1 | tee -a $logfile
+        echo -e "Admin Certificate: /root/webadmin.p12" 2>&1 | tee -a $logfile
+        echo -e "Default Enrollment: /root/enrollment-default.zip" 2>&1 | tee -a $logfile
+    fi
+}
+#::::::::::
 # Begin Docker Installation
 #::::::::::
 installDocker(){
