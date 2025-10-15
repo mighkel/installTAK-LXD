@@ -1654,6 +1654,7 @@ executeConfiguration(){
             echo -e "${GREEN}Initialization Complete.${NC}"
             ;;
     esac
+    postInstallVerification
 }
 #::::::::::
 # Post-Install Verification for LXD Containers
