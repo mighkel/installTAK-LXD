@@ -1,8 +1,19 @@
 #!/bin/bash
-#Version 2.4
-#JR@myTeckNet
+#Version 2.4-LXD
+#JR@myTeckNet + LXD Container Enhancements
+#
+# Usage: 
+#   Normal install: ./installTAK <takserver.deb>
+#   LXD container:  ./installTAK <takserver.deb> false true
+#
+# Arguments:
+#   $1: Path to TAK Server .deb file (required)
+#   $2: FIPS mode (true/false) - default: false  
+#   $3: LXD mode (true/false) - default: false
+#
 #globalVariables
 fips=${2:-false}
+lxdMode=${3:-false}
 sVER="2.0.4"
 logfile="/tmp/.takinstall.log"
 RED='\033[0;31m'
@@ -26,6 +37,28 @@ abort() {
     fi
     echo -e "${RED}Task aborted.${NC}"
     exit 1
+}
+#::::::::::
+# LXD Container Networking Verification
+#::::::::::
+verifyContainerNetworking(){
+    if [[ $lxdMode == "true" ]]; then
+        echo -e "${YELLOW}LXD Mode: Verifying container networking...${NC}" 2>&1 | tee -a $logfile
+        
+        # Check internet connectivity
+        if ! ping -c 2 8.8.8.8 > /dev/null 2>&1; then
+            ERRoR="No internet connectivity detected. Container networking may not be configured.\nSee deployment guide section 5.3b for troubleshooting."
+            abort
+        fi
+        
+        # Check DNS resolution
+        if ! nslookup archive.ubuntu.com > /dev/null 2>&1; then
+            ERRoR="DNS resolution failing. Check /etc/resolv.conf in container."
+            abort
+        fi
+        
+        echo -e "${GREEN}✓ Container networking verified${NC}" 2>&1 | tee -a $logfile
+    fi
 }
 #::::::::::
 # Prerequisite Checks
