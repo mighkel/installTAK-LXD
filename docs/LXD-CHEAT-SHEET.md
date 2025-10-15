@@ -8,14 +8,14 @@ Quick reference for common LXD container operations during TAK Server deployment
 ```bash
 # ESSENTIAL COMMANDS
 lxc list                              # Show all containers
-lxc exec CONTAINER -- bash            # Get shell
+lxc exec CONTAINER -- bash            # Get shell (run commands within container)
 lxc file push FILE CONTAINER/path/    # Upload file
 lxc file pull CONTAINER/path/ ./      # Download file
 lxc snapshot CONTAINER name           # Create backup
 lxc restore CONTAINER name            # Restore backup
 lxc stop CONTAINER                    # Stop container
 lxc start CONTAINER                   # Start container
-exit                                  # Leave container shell
+exit                                  # Leave container shell (go back to host)
 
 # FILE SHORTCUTS (from host)
 lxc exec tak -- systemctl status takserver           # Check TAK status
