@@ -1,0 +1,95 @@
+# installTAK-LXD .gitignore
+# Prevents committing secrets and sensitive files
+
+# Environment configuration (contains secrets)
+.env
+.env.local
+.env.production
+*.env
+
+# TAK Server files (not redistributable)
+*.rpm
+*.deb
+*.noarch.rpm
+takserver-*.zip
+takserver-docker-*.zip
+takserver-public-gpg.key
+deb_policy.pol
+
+# Certificate files (NEVER commit these!)
+*.p12
+*.jks
+*.pem
+*.key
+*.crt
+*.csr
+*.cer
+truststore*.p12
+admin.p12
+webadmin.p12
+enrollmentDP.zip
+*.zip
+
+# Backup and temporary files
+*.bak
+*.backup
+*.old
+*.tmp
+*~
+.DS_Store
+Thumbs.db
+
+# Log files
+*.log
+logs/
+*.log.*
+
+# Python (for gdown and other utilities)
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+ENV/
+env/
+.venv
+pip-log.txt
+pip-delete-this-directory.txt
+
+# SSH keys (should never be in repo)
+id_rsa
+id_rsa.pub
+*.ppk
+known_hosts
+
+# Editor and IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*.sublime-*
+.project
+.settings/
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Desktop.ini
+
+# Private notes and sensitive docs
+PRIVATE-*.md
+*-PRIVATE.md
+notes-private/
+secrets/
+
+# Test and development containers
+test-container/
+dev-snapshots/
+
+# Compiled scripts
+*.sh~
