@@ -395,11 +395,8 @@ lxc exec tak -- ping -c 1 1.1.1.1 &>/dev/null && echo "✅" || echo "❌"
 echo -n "Container DNS working: "
 lxc exec tak -- ping -c 1 google.com &>/dev/null && echo "✅" || echo "❌"
 
-echo -n "PostgreSQL installed: "
-lxc exec tak -- systemctl is-active postgresql &>/dev/null && echo "✅" || echo "❌"
-
-echo -n "Java installed: "
-lxc exec tak -- java -version &>/dev/null && echo "✅" || echo "❌"
+echo -n "Git installed: "
+lxc exec tak -- git --version &>/dev/null && echo "✅" || echo "❌"
 
 echo -n "Python3 installed: "
 lxc exec tak -- python3 --version &>/dev/null && echo "✅" || echo "❌"
@@ -415,6 +412,8 @@ lxc info tak | grep -q "fresh-setup" && echo "✅" || echo "❌"
 
 echo ""
 echo "If all checks show ✅, proceed to Phase 3: TAK Installation"
+echo ""
+echo "Note: installTAK script will install PostgreSQL and Java automatically"
 ```
 
 **Run it:**
