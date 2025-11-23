@@ -176,14 +176,42 @@ which curl      # Should show path
 
 ### 4.2 Install gdown (for Google Drive file fetching)
 ```bash
-# Install gdown for downloading TAK files from Google Drive
-pip3 install gdown --break-system-packages
+# Option 1: Try installing gdown directly (works on Ubuntu 22.04)
+pip3 install gdown
+
+# If that fails with "externally managed environment" error:
+# Option 2: Use apt package manager instead
+apt install -y python3-gdown
 
 # Verify installation
 gdown --version
+
+# Expected output: gdown x.x.x
 ```
 
-**Note:** The `--break-system-packages` flag is required on Ubuntu 22.04+ due to PEP 668.
+**Troubleshooting gdown installation:**
+
+If `gdown --version` still shows "command not found":
+```bash
+# Update pip first, then try again
+pip3 install --upgrade pip
+pip3 install gdown
+
+# If still failing, check where pip installed it
+find /usr -name gdown 2>/dev/null
+
+# May need to add to PATH or use full path:
+/usr/local/bin/gdown --version
+```
+
+**Alternative: Use apt package (simpler):**
+```bash
+# Just use the apt version - it works fine
+apt install -y python3-gdown
+gdown --version
+```
+
+**Note:** For Ubuntu 22.04 containers, the apt package method is usually most reliable.
 
 ---
 
