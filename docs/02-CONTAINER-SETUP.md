@@ -176,42 +176,24 @@ which curl      # Should show path
 
 ### 4.2 Install gdown (for Google Drive file fetching)
 ```bash
-# Option 1: Try installing gdown directly (works on Ubuntu 22.04)
-pip3 install gdown
+# First, upgrade pip to latest version
+pip3 install --upgrade pip
 
-# If that fails with "externally managed environment" error:
-# Option 2: Use apt package manager instead
-apt install -y python3-gdown
+# Then install gdown
+pip3 install gdown
 
 # Verify installation
 gdown --version
 
-# Expected output: gdown x.x.x
+# Expected output: gdown 5.2.0 (or similar)
 ```
 
-**Troubleshooting gdown installation:**
-
-If `gdown --version` still shows "command not found":
-```bash
-# Update pip first, then try again
-pip3 install --upgrade pip
-pip3 install gdown
-
-# If still failing, check where pip installed it
-find /usr -name gdown 2>/dev/null
-
-# May need to add to PATH or use full path:
-/usr/local/bin/gdown --version
+**Expected output:**
+```
+gdown 5.2.0 at /usr/local/lib/python3.10/dist-packages
 ```
 
-**Alternative: Use apt package (simpler):**
-```bash
-# Just use the apt version - it works fine
-apt install -y python3-gdown
-gdown --version
-```
-
-**Note:** For Ubuntu 22.04 containers, the apt package method is usually most reliable.
+**Note:** You may see warnings about running pip as root - these can be safely ignored in a container environment.
 
 ---
 
