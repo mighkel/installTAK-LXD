@@ -73,13 +73,114 @@ exit
 ```
 
 **Set up SSH key for takadmin:**
+
+#### For Windows Users (PuTTY)
+
+**Step 1: Generate SSH Key Pair with PuTTYgen**
+
+1. Download and install **PuTTY** from https://www.putty.org/ (if not already installed)
+2. Launch **PuTTYgen** (comes with PuTTY installer)
+3. Click "Generate"
+4. Move your mouse randomly in the blank area to generate randomness
+5. Once generated:
+   - **Key comment:** Change to `takadmin@pinetech3` (or your VPS name)
+   - **Key passphrase:** Enter a strong passphrase (optional but recommended)
+   - **Confirm passphrase:** Re-enter same passphrase
+6. **Save private key:**
+   - Click "Save private key"
+   - Save as `takadmin-pinetech3.ppk` in a safe location (e.g., `C:\Users\YourName\.ssh\`)
+7. **Copy public key:**
+   - Select ALL text in the "Public key for pasting into OpenSSH authorized_keys file" box
+   - Right-click → Copy (or Ctrl+C)
+   - **Don't close PuTTYgen yet!**
+
+**Step 2: Add Public Key to VPS**
 ```bash
-# From your local machine, copy SSH key
-ssh-copy-id takadmin@your-vps-ip
+# Still connected to VPS as root or your current user
+# Switch to takadmin
+su - takadmin
+
+# Create .ssh directory
+mkdir -p ~/.ssh
+chmod 700 ~/.ssh
+
+# Create authorized_keys file
+nano ~/.ssh/authorized_keys
+
+# Paste the public key you copied from PuTTYgen
+# (Right-click in PuTTY to paste)
+# Should be one long line starting with "ssh-rsa AAAA..."
+
+# Save and exit (Ctrl+X, Y, Enter)
+
+# Set correct permissions
+chmod 600 ~/.ssh/authorized_keys
+
+# Exit back to root/original user
+exit
+```
+
+**Step 3: Configure PuTTY to Use Your Private Key**
+
+1. Open **PuTTY**
+2. In the left panel, navigate to: **Connection → SSH → Auth**
+3. Click "Browse" next to "Private key file for authentication"
+4. Select your saved `takadmin-pinetech3.ppk` file
+5. In the left panel, go back to **Session**
+6. Enter connection details:
+   - **Host Name:** `takadmin@your-vps-ip` (e.g., `takadmin@104.225.221.119`)
+   - **Port:** `22`
+   - **Connection type:** SSH
+7. **Save this session:**
+   - In "Saved Sessions" box, type: `TAK-VPS-pinetech3`
+   - Click "Save"
+8. Click "Open" to connect
+
+**Step 4: Test Connection**
+
+- Should connect without asking for password (if you didn't set a passphrase)
+- If you set a passphrase, you'll be prompted for it
+- Once connected, you should be logged in as takadmin
+
+**Optional: Use Pageant for Passphrase Management**
+
+If you used a passphrase, you can use **Pageant** (comes with PuTTY) to avoid entering it every time:
+
+1. Launch **Pageant** (system tray icon)
+2. Right-click Pageant icon → "Add Key"
+3. Select your `takadmin-pinetech3.ppk` file
+4. Enter passphrase once
+5. PuTTY will now use the key automatically without prompting
+
+---
+
+#### For Linux/Mac Users (Traditional SSH)
+```bash
+# From your local machine (not VPS)
+ssh-keygen -t rsa -b 4096 -C "takadmin@pinetech3"
+
+# Save to: ~/.ssh/takadmin-pinetech3
+# Enter passphrase (optional)
+
+# Copy public key to VPS
+ssh-copy-id -i ~/.ssh/takadmin-pinetech3.pub takadmin@your-vps-ip
 
 # Test passwordless login
-ssh takadmin@your-vps-ip
+ssh -i ~/.ssh/takadmin-pinetech3 takadmin@your-vps-ip
 ```
+
+---
+
+**Verify SSH Key Authentication Works:**
+```bash
+# Try connecting - should NOT ask for password
+# (or only ask for passphrase if you set one)
+
+# From PuTTY: Load saved session and click "Open"
+# From Linux/Mac: ssh -i ~/.ssh/takadmin-pinetech3 takadmin@your-vps-ip
+```
+
+**Security Note:** Keep your `.ppk` file safe! Anyone with this file (and passphrase if set) can access your VPS as takadmin.
 
 ---
 
