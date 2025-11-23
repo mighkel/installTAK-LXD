@@ -13,8 +13,6 @@ This guide assumes you've completed:
 Before starting Phase 3, verify:
 
 - [ ] TAK container is running with internet access
-- [ ] PostgreSQL is installed and running in container
-- [ ] Java 17 is installed in container
 - [ ] takadmin user exists with sudo access
 - [ ] Fresh snapshot created: `lxc snapshot tak fresh-setup`
 
