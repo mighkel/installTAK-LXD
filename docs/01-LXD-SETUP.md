@@ -558,7 +558,7 @@ echo "If all checks show ✅, proceed to Phase 2: Container Setup"
 
 **Save this as `verify-lxd.sh` and run:**
 ```bash
-chmod +x verify-lxd.sh
+sudo chmod +x verify-lxd.sh
 ./verify-lxd.sh
 ```
 
