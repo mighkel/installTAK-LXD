@@ -147,101 +147,56 @@ exit
 
 ---
 
-## Step 4: Install TAK Server Prerequisites
+## Step 4: Install Basic Prerequisites
 
-These packages are required for TAK Server to run properly.
+The installTAK script will handle PostgreSQL and Java installation automatically. We only need basic tools.
 
-### 4.1 Install PostgreSQL
+### 4.1 Install Essential Utilities
 ```bash
 # Still in the container as root
 
-# Add PostgreSQL repository
-apt install -y wget ca-certificates
-wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | apt-key add -
-echo "deb http://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list
-
-# Update and install PostgreSQL 15
-apt update
-apt install -y postgresql-15 postgresql-15-postgis-3
-
-# Verify PostgreSQL is running
-systemctl status postgresql
-
-# Expected: active (running)
-```
-
-### 4.2 Install Java
-
-TAK Server requires Java 17.
-```bash
-# Install OpenJDK 17
-apt install -y openjdk-17-jdk-headless
-
-# Verify installation
-java -version
-
-# Expected output similar to:
-# openjdk version "17.0.x"
-```
-
-### 4.3 Install Additional Dependencies
-```bash
-# Install required packages
+# Install basic tools needed for installation
 apt install -y \
     wget \
     curl \
+    git \
     unzip \
     zip \
     python3 \
     python3-pip \
     net-tools \
     vim \
-    netcat
+    nano
 
 # Verify installations
-which java      # Should show path
-which psql      # Should show path
+which git       # Should show path
 which python3   # Should show path
+which curl      # Should show path
 ```
+
+### 4.2 Install gdown (for Google Drive file fetching)
+```bash
+# Install gdown for downloading TAK files from Google Drive
+pip3 install gdown --break-system-packages
+
+# Verify installation
+gdown --version
+```
+
+**Note:** The `--break-system-packages` flag is required on Ubuntu 22.04+ due to PEP 668.
 
 ---
 
-## Step 5: Configure PostgreSQL for TAK Server
+## Step 5: Prepare for installTAK Script
 
-### 5.1 Verify PostgreSQL is Running
-```bash
-# Check PostgreSQL status
-systemctl status postgresql
+The installTAK script will automatically install:
+- ✅ PostgreSQL 15 with PostGIS
+- ✅ Java 17 (OpenJDK)
+- ✅ TAK Server package
+- ✅ Database configuration
+- ✅ Firewall rules
 
-# If not running, start it:
-# systemctl start postgresql
-# systemctl enable postgresql
-```
-
-### 5.2 Test PostgreSQL Connection
-```bash
-# Switch to postgres user
-su - postgres
-
-# Connect to PostgreSQL
-psql
-
-# You should see: postgres=#
-
-# Exit psql
-\q
-
-# Exit postgres user
-exit
-```
-
-**If this works, PostgreSQL is ready for TAK Server! ✅**
-
----
-
-## Step 6: Prepare for installTAK Script
-
-### 6.1 Create Working Directory
+### 5.1 Create Working Directory
 ```bash
 # Create directory for TAK installation files
 mkdir -p /home/takadmin/takserver-install
@@ -250,16 +205,6 @@ cd /home/takadmin/takserver-install
 # Set ownership
 chown -R takadmin:takadmin /home/takadmin/takserver-install
 ```
-
-### 6.2 Install gdown (for Google Drive file fetching)
-```bash
-# Install gdown for downloading TAK files from Google Drive
-pip3 install gdown
-
-# Verify installation
-gdown --version
-```
-
 **Alternative: Manual File Transfer**
 
 If you prefer to manually transfer files instead of using gdown:
@@ -272,11 +217,27 @@ scp takserver-5.5-RELEASE.deb takadmin@your-vps-ip:~/
 lxc file push ~/takserver-5.5-RELEASE.deb tak/home/takadmin/takserver-install/
 ```
 
+### 5.2 Verify Container is Ready
+
+Before proceeding to Phase 3, verify:
+- [ ] Container has internet access
+- [ ] Basic utilities installed (git, wget, curl)
+- [ ] gdown is installed
+- [ ] takadmin user exists
+- [ ] Working directory created
+```bash
+# Quick verification
+ping -c 3 1.1.1.1        # Internet works
+git --version             # Git installed
+gdown --version           # gdown installed
+id takadmin               # User exists
+ls -ld /home/takadmin/takserver-install  # Directory exists
+```
 ---
 
-## Step 7: Network Configuration Notes
+## Step 6: Network Configuration Notes
 
-### 7.1 Document Container IP
+### 6.1 Document Container IP
 ```bash
 # From VPS host (not in container):
 lxc list tak
@@ -284,7 +245,7 @@ lxc list tak
 # Note the IPv4 address - example: 10.206.248.11
 ```
 
-### 7.2 Test Host-to-Container Connectivity
+### 6.2 Test Host-to-Container Connectivity
 ```bash
 # From VPS host, test connection to container
 ping -c 3 [container-ip]
@@ -295,7 +256,7 @@ ping -c 3 10.206.248.11
 # Should succeed ✅
 ```
 
-### 7.3 Plan Port Forwarding Strategy
+### 6.3 Plan Port Forwarding Strategy
 
 You'll need to decide how external traffic reaches the TAK container:
 
@@ -314,11 +275,11 @@ lxc config device add tak tak-8089 proxy \
 
 ---
 
-## Step 8: Container Resource Limits (Optional)
+## Step 7: Container Resource Limits (Optional)
 
 Set limits to prevent TAK Server from consuming all VPS resources.
 
-### 8.1 Check Current Resource Usage
+### 7.1 Check Current Resource Usage
 ```bash
 # From VPS host:
 lxc info tak
@@ -326,7 +287,7 @@ lxc info tak
 # Shows CPU, memory, and disk usage
 ```
 
-### 8.2 Set CPU Limits
+### 7.2 Set CPU Limits
 ```bash
 # Limit to 2 CPU cores (adjust based on VPS size)
 lxc config set tak limits.cpu 2
@@ -335,7 +296,7 @@ lxc config set tak limits.cpu 2
 lxc config get tak limits.cpu
 ```
 
-### 8.3 Set Memory Limits
+### 7.3 Set Memory Limits
 ```bash
 # Set 4GB memory limit (adjust based on VPS RAM)
 lxc config set tak limits.memory 4GB
@@ -344,7 +305,7 @@ lxc config set tak limits.memory 4GB
 lxc config get tak limits.memory
 ```
 
-### 8.4 Set Disk Limits
+### 7.4 Set Disk Limits
 ```bash
 # Set root disk size limit (optional)
 lxc config device override tak root size=60GB
@@ -355,13 +316,13 @@ lxc config show tak
 
 ---
 
-## Step 9: Create Container Snapshot
+## Step 8: Create Container Snapshot
 
 **Before proceeding to TAK installation, create a snapshot!**
 
 This lets you rollback if something goes wrong.
 
-### 9.1 Exit Container and Create Snapshot
+### 8.1 Exit Container and Create Snapshot
 ```bash
 # If you're inside the container, exit first
 exit
@@ -373,7 +334,7 @@ lxc snapshot tak fresh-setup
 lxc info tak | grep -A 10 Snapshots
 ```
 
-### 9.2 How to Restore from Snapshot (if needed)
+### 8.2 How to Restore from Snapshot (if needed)
 ```bash
 # Stop container
 lxc stop tak
@@ -387,7 +348,7 @@ lxc start tak
 
 ---
 
-## Step 10: Verification Checklist
+## Step 9: Verification Checklist
 
 Before moving to Phase 3 (TAK Installation), verify all these:
 
@@ -403,8 +364,7 @@ Before moving to Phase 3 (TAK Installation), verify all these:
 - [ ] Host can ping container IP
 
 **Software Prerequisites:**
-- [ ] PostgreSQL is installed and running
-- [ ] Java 17 is installed (`java -version`)
+- [ ] Git is installed (`git --version`)
 - [ ] Python3 is installed (`python3 --version`)
 - [ ] gdown is installed (`gdown --version`)
 
