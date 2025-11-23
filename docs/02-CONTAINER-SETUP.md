@@ -268,20 +268,152 @@ ping -c 3 10.206.248.11
 
 ### 6.3 Plan Port Forwarding Strategy
 
-You'll need to decide how external traffic reaches the TAK container:
+You'll need to decide how external traffic reaches containers on your VPS.
 
-**Option A: LXD Proxy Device** (Simpler, recommended for single service)
+### Understanding Your Deployment Type
+
+**Single Service Deployment:**
+- ONLY TAK Server running on the VPS
+- No other web services, apps, or containers
+- Simple use case: VPS exists solely for TAK
+
+**Multi-Service Deployment:**
+- TAK Server PLUS other services like:
+  - Web server (Apache/Nginx)
+  - NextCloud file sharing
+  - MediaMTX video streaming (RTSP)
+  - Other applications
+- Multiple containers sharing ports (80, 443, etc.)
+- Need intelligent routing by domain/subdomain
+
+---
+
+### Option A: LXD Proxy Device (Single Service ONLY)
+
+**Use this ONLY if:**
+- ✅ TAK Server is your ONLY service
+- ✅ No web server, no NextCloud, no other apps
+- ✅ Simple deployment
+
+**Pros:**
+- ✅ Simpler setup
+- ✅ Built into LXD
+- ✅ No additional container needed
+- ✅ Less configuration
+
+**Cons:**
+- ❌ Cannot handle multiple services well
+- ❌ No domain-based routing
+- ❌ Port conflicts with other services
+- ❌ Limited flexibility
+
+**Example (don't run yet):**
 ```bash
-# Example (don't run yet - this is Phase 5):
+# Forward TAK ports directly to container
 lxc config device add tak tak-8089 proxy \
     listen=tcp:0.0.0.0:8089 \
     connect=tcp:127.0.0.1:8089
 ```
 
-**Option B: HAProxy** (More complex, better for multiple services)
-- Covered in [Phase 5: Networking](05-NETWORKING.md)
+---
 
-**For now, just note which approach you'll use.**
+### Option B: HAProxy (Multi-Service - RECOMMENDED for your use case)
+
+**Use this if you're running:**
+- ✅ TAK Server
+- ✅ Web server (Apache/Nginx)
+- ✅ NextCloud
+- ✅ MediaMTX (RTSP streaming)
+- ✅ Any combination of services
+
+**Pros:**
+- ✅ Professional-grade load balancer
+- ✅ Route by domain/subdomain
+  - `tak.pinenut.tech` → TAK Server
+  - `web.pinenut.tech` → Web Server
+  - `files.pinenut.tech` → NextCloud
+  - `rtsp.pinenut.tech` → MediaMTX
+- ✅ Advanced health checks
+- ✅ Statistics dashboard
+- ✅ SSL/TLS termination options
+- ✅ Can share ports (80, 443) across services
+
+**Cons:**
+- ❌ More complex initial setup
+- ❌ Requires separate container
+- ❌ More configuration to maintain
+
+**Your Planned Architecture with HAProxy:**
+```
+Internet
+    ↓
+VPS Public IP (104.225.221.119)
+    ↓
+HAProxy Container (10.206.248.12)
+    ├─→ tak.pinenut.tech:8089 → TAK Container (10.206.248.11:8089)
+    ├─→ web.pinenut.tech:80 → Web Container (10.206.248.13:80)
+    ├─→ files.pinenut.tech:443 → NextCloud Container (10.206.248.14:443)
+    └─→ rtsp.pinenut.tech:8554 → MediaMTX Container (10.206.248.15:8554)
+```
+
+---
+
+### Decision for Your Deployment
+
+**Based on your plans for:**
+- TAK Server ✅
+- Web server ✅
+- RTSP (MediaMTX) ✅
+- NextCloud ✅
+- Possible other services ✅
+
+**→ You MUST use HAProxy (Option B)**
+
+**Why:**
+- You have multiple services competing for standard ports
+- You need domain-based routing (tak.pinenut.tech vs files.pinenut.tech)
+- You want room to grow with additional services
+- Professional deployment requires proper reverse proxy
+
+---
+
+### What You'll Set Up in Phase 5
+
+Phase 5 (Networking) will cover HAProxy setup including:
+
+1. **Creating HAProxy container**
+2. **Configuring domain routing:**
+   - `tak.pinenut.tech:8089` → TAK Server (TCP passthrough)
+   - `tak.pinenut.tech:8443` → TAK Web UI (TCP passthrough)
+   - `web.pinenut.tech` → Your web server
+   - `files.pinenut.tech` → NextCloud
+   - `rtsp.pinenut.tech:8554` → MediaMTX
+
+3. **SSL/TLS handling:**
+   - TAK Server: Uses its own certificates (mutual TLS)
+   - Web services: Can use Let's Encrypt via HAProxy
+
+4. **Health monitoring and stats**
+
+---
+
+### For Now
+
+**Note in your planning doc:**
+- ✅ Using HAProxy for multi-service deployment
+- ✅ Reserve container IPs:
+  - `10.206.248.11` - TAK Server
+  - `10.206.248.12` - HAProxy
+  - `10.206.248.13` - Web Server
+  - `10.206.248.14` - NextCloud
+  - `10.206.248.15` - MediaMTX
+- ✅ DNS records needed:
+  - `tak.pinenut.tech` → VPS IP
+  - `web.pinenut.tech` → VPS IP
+  - `files.pinenut.tech` → VPS IP
+  - (Optional: `rtsp.pinenut.tech` → VPS IP)
+
+**Phase 5 will provide complete HAProxy configuration for all your services.**
 
 ---
 
