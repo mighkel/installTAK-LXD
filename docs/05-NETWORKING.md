@@ -269,6 +269,508 @@ listen stats
 
 **Save and exit** (Ctrl+X, Y, Enter)
 
+---
+
+## Step 3A: Multi-Service HAProxy Configuration
+
+**Use this configuration if you're running multiple services** (TAK + Web + NextCloud + MediaMTX + others)
+
+### Understanding Service Types
+
+HAProxy handles different service types differently:
+
+**TCP Passthrough (for TAK Server):**
+- HAProxy forwards raw TCP traffic
+- No SSL termination - TAK handles its own certificates
+- Required for mutual TLS authentication
+- Ports: 8089, 8443, 8446
+
+**HTTP/HTTPS (for web services):**
+- HAProxy can terminate SSL or passthrough
+- Domain-based routing (SNI)
+- Can share port 80/443 across multiple services
+- Services: Web server, NextCloud
+
+**TCP with different ports (for MediaMTX):**
+- Simple TCP forwarding on unique ports
+- No SSL complexity
+- Port: 8554 (RTSP)
+
+---
+
+### Step 3A.1: Plan Your Container IPs
+
+Before configuring HAProxy, document your container IPs:
+```bash
+# Create containers (if not already created)
+lxc launch ubuntu:22.04 tak        # TAK Server
+lxc launch ubuntu:22.04 haproxy    # HAProxy reverse proxy
+lxc launch ubuntu:22.04 web        # Web server (optional)
+lxc launch ubuntu:22.04 nextcloud  # NextCloud (future)
+lxc launch ubuntu:22.04 mediamtx   # MediaMTX (future)
+
+# Wait for network assignment
+sleep 10
+
+# List all container IPs
+lxc list -c n4
+
+# Example output:
+# +----------+---------------------+
+# |   NAME   |        IPV4         |
+# +----------+---------------------+
+# | tak      | 10.206.248.11       |
+# | haproxy  | 10.206.248.12       |
+# | web      | 10.206.248.13       |
+# | nextcloud| 10.206.248.14       |
+# | mediamtx | 10.206.248.15       |
+# +----------+---------------------+
+```
+
+**Document these IPs - you'll need them for HAProxy config!**
+
+---
+
+### Step 3A.2: Complete Multi-Service HAProxy Configuration
+```bash
+# Access HAProxy container
+lxc exec haproxy -- bash
+
+# Backup original config
+cp /etc/haproxy/haproxy.cfg /etc/haproxy/haproxy.cfg.original
+
+# Create new multi-service config
+nano /etc/haproxy/haproxy.cfg
+```
+
+**Paste this complete configuration:**
+```haproxy
+global
+    log /dev/log    local0
+    log /dev/log    local1 notice
+    chroot /var/lib/haproxy
+    stats socket /run/haproxy/admin.sock mode 660 level admin
+    stats timeout 30s
+    user haproxy
+    group haproxy
+    daemon
+
+    # SSL/TLS configuration
+    ca-base /etc/ssl/certs
+    crt-base /etc/ssl/private
+    ssl-default-bind-ciphers ECDHE+AESGCM:ECDHE+CHACHA20:!RSA
+    ssl-default-bind-options ssl-min-ver TLSv1.2
+    
+    # Performance tuning
+    maxconn 4096
+    tune.ssl.default-dh-param 2048
+
+defaults
+    log     global
+    mode    tcp
+    option  tcplog
+    option  dontlognull
+    timeout connect 5s
+    timeout client  1m
+    timeout server  1m
+    errorfile 400 /etc/haproxy/errors/400.http
+    errorfile 403 /etc/haproxy/errors/403.http
+    errorfile 408 /etc/haproxy/errors/408.http
+    errorfile 500 /etc/haproxy/errors/500.http
+    errorfile 502 /etc/haproxy/errors/502.http
+    errorfile 503 /etc/haproxy/errors/503.http
+    errorfile 504 /etc/haproxy/errors/504.http
+
+#============================================================
+# TAK SERVER - TCP PASSTHROUGH (Mutual TLS)
+#============================================================
+
+# TAK Client Connections (Port 8089)
+frontend tak-client
+    bind *:8089
+    mode tcp
+    option tcplog
+    tcp-request inspect-delay 5s
+    tcp-request content accept if { req.ssl_hello_type 1 }
+    default_backend tak-client-backend
+
+backend tak-client-backend
+    mode tcp
+    option ssl-hello-chk
+    server tak1 10.206.248.11:8089 check
+
+# TAK Web UI (Port 8443)
+frontend tak-webui
+    bind *:8443
+    mode tcp
+    option tcplog
+    tcp-request inspect-delay 5s
+    tcp-request content accept if { req.ssl_hello_type 1 }
+    default_backend tak-webui-backend
+
+backend tak-webui-backend
+    mode tcp
+    option ssl-hello-chk
+    server takweb 10.206.248.11:8443 check
+
+# TAK Certificate Enrollment (Port 8446)
+frontend tak-enrollment
+    bind *:8446
+    mode tcp
+    option tcplog
+    tcp-request inspect-delay 5s
+    tcp-request content accept if { req.ssl_hello_type 1 }
+    default_backend tak-enrollment-backend
+
+backend tak-enrollment-backend
+    mode tcp
+    option ssl-hello-chk
+    server takenroll 10.206.248.11:8446 check
+
+#============================================================
+# WEB SERVICES - HTTP/HTTPS with SNI Routing
+#============================================================
+
+# HTTP Frontend (Port 80)
+# Handles: ACME challenges, HTTP redirects, non-SSL traffic
+frontend http-in
+    bind *:80
+    mode http
+    option httplog
+    
+    # Log format
+    log-format "%ci:%cp [%tr] %ft %b/%s %TR/%Tw/%Tc/%Tr/%Ta %ST %B %CC %CS %tsc %ac/%fc/%bc/%sc/%rc %sq/%bq %hr %hs %{+Q}r"
+    
+    # ACME Challenge routing for Let's Encrypt
+    acl is_acme_challenge path_beg /.well-known/acme-challenge/
+    
+    # Route ACME challenges to TAK container (has certbot)
+    use_backend tak-acme-backend if is_acme_challenge
+    
+    # Domain-based routing
+    acl host_web hdr(host) -i web.pinenut.tech
+    acl host_files hdr(host) -i files.pinenut.tech
+    
+    use_backend web-backend if host_web
+    use_backend nextcloud-backend if host_files
+    
+    # Default: Redirect to HTTPS
+    http-request redirect scheme https code 301 unless is_acme_challenge
+
+backend tak-acme-backend
+    mode http
+    server tak 10.206.248.11:80 check
+
+backend web-backend
+    mode http
+    server web1 10.206.248.13:80 check
+
+backend nextcloud-backend
+    mode http
+    server nextcloud1 10.206.248.14:80 check
+
+# HTTPS Frontend (Port 443)
+# Handles: SSL/TLS web traffic with SNI routing
+frontend https-in
+    bind *:443
+    mode tcp
+    option tcplog
+    tcp-request inspect-delay 5s
+    tcp-request content accept if { req.ssl_hello_type 1 }
+    
+    # SNI-based routing
+    acl host_web req.ssl_sni -i web.pinenut.tech
+    acl host_files req.ssl_sni -i files.pinenut.tech
+    
+    use_backend web-ssl-backend if host_web
+    use_backend nextcloud-ssl-backend if host_files
+    
+    # Default backend
+    default_backend web-ssl-backend
+
+backend web-ssl-backend
+    mode tcp
+    option ssl-hello-chk
+    server web1 10.206.248.13:443 check
+
+backend nextcloud-ssl-backend
+    mode tcp
+    option ssl-hello-chk
+    server nextcloud1 10.206.248.14:443 check
+
+#============================================================
+# MEDIAMTX - RTSP Video Streaming (Port 8554)
+#============================================================
+
+frontend rtsp-in
+    bind *:8554
+    mode tcp
+    option tcplog
+    default_backend rtsp-backend
+
+backend rtsp-backend
+    mode tcp
+    server mediamtx1 10.206.248.15:8554 check
+
+#============================================================
+# HAPROXY STATISTICS & MONITORING
+#============================================================
+
+listen stats
+    bind *:8404
+    mode http
+    stats enable
+    stats uri /haproxy_stats
+    stats refresh 30s
+    stats auth admin:ChangeThisStatsPassword123
+    stats admin if TRUE
+```
+
+**Important:** 
+- Replace `10.206.248.X` with your actual container IPs
+- Change stats password from `ChangeThisStatsPassword123`
+
+**Save and exit** (Ctrl+X, Y, Enter)
+
+---
+
+### Step 3A.3: Test and Apply Configuration
+```bash
+# Test configuration syntax
+haproxy -c -f /etc/haproxy/haproxy.cfg
+
+# Expected: Configuration file is valid
+
+# If valid, restart HAProxy
+systemctl restart haproxy
+
+# Check status
+systemctl status haproxy
+
+# View logs in real-time
+tail -f /var/log/haproxy.log
+```
+
+---
+
+### Step 3A.4: Understanding the Configuration
+
+**TAK Server Section:**
+```haproxy
+frontend tak-client
+    bind *:8089
+    mode tcp              # Raw TCP passthrough
+    option ssl-hello-chk  # Check SSL handshake
+    default_backend tak-client-backend
+```
+- **No SSL termination** - TAK handles its own certificates
+- **Mutual TLS** - Client and server authenticate each other
+- **Required** for TAK client authentication to work
+
+**Web Services Section:**
+```haproxy
+frontend https-in
+    bind *:443
+    mode tcp
+    tcp-request inspect-delay 5s
+    acl host_web req.ssl_sni -i web.pinenut.tech
+    use_backend web-ssl-backend if host_web
+```
+- **SNI inspection** - Routes by domain name
+- **Multiple services** on same port (443)
+- **Can terminate SSL** at HAProxy or passthrough to backend
+
+**MediaMTX Section:**
+```haproxy
+frontend rtsp-in
+    bind *:8554
+    mode tcp
+    default_backend rtsp-backend
+```
+- **Simple TCP forwarding**
+- **Dedicated port** - no routing needed
+- **No SSL** - RTSP typically unencrypted (use RTSPS if needed)
+
+---
+
+### Step 3A.5: Port Forwarding to HAProxy Container
+
+Now forward ports from VPS host to HAProxy container:
+```bash
+# Exit HAProxy container
+exit
+
+# From VPS host, get HAProxy container IP
+lxc list haproxy
+
+# Example: 10.206.248.12
+
+# Forward all required ports to HAProxy container
+lxc config device add haproxy proxy-80 proxy \
+    listen=tcp:0.0.0.0:80 \
+    connect=tcp:127.0.0.1:80
+
+lxc config device add haproxy proxy-443 proxy \
+    listen=tcp:0.0.0.0:443 \
+    connect=tcp:127.0.0.1:443
+
+lxc config device add haproxy proxy-8089 proxy \
+    listen=tcp:0.0.0.0:8089 \
+    connect=tcp:127.0.0.1:8089
+
+lxc config device add haproxy proxy-8443 proxy \
+    listen=tcp:0.0.0.0:8443 \
+    connect=tcp:127.0.0.1:8443
+
+lxc config device add haproxy proxy-8446 proxy \
+    listen=tcp:0.0.0.0:8446 \
+    connect=tcp:127.0.0.1:8446
+
+lxc config device add haproxy proxy-8554 proxy \
+    listen=tcp:0.0.0.0:8554 \
+    connect=tcp:127.0.0.1:8554
+
+# Optional: Stats page
+lxc config device add haproxy proxy-8404 proxy \
+    listen=tcp:0.0.0.0:8404 \
+    connect=tcp:127.0.0.1:8404
+
+# Verify all proxy devices
+lxc config show haproxy | grep -A 3 proxy
+```
+
+---
+
+### Step 3A.6: DNS Configuration for Multi-Service
+
+Configure DNS A records for all services:
+
+| Hostname | Type | Value | TTL |
+|----------|------|-------|-----|
+| tak.pinenut.tech | A | 104.225.221.119 | 3600 |
+| web.pinenut.tech | A | 104.225.221.119 | 3600 |
+| files.pinenut.tech | A | 104.225.221.119 | 3600 |
+| rtsp.pinenut.tech | A | 104.225.221.119 | 3600 |
+
+**All point to same VPS IP** - HAProxy routes by domain name!
+
+---
+
+### Step 3A.7: Testing Multi-Service Routing
+
+**Test TAK Server:**
+```bash
+openssl s_client -connect tak.pinenut.tech:8089 -showcerts
+# Should connect to TAK container
+```
+
+**Test Web Server (when configured):**
+```bash
+curl -I http://web.pinenut.tech
+# Should route to web container
+```
+
+**Test NextCloud (when configured):**
+```bash
+curl -I http://files.pinenut.tech
+# Should route to nextcloud container
+```
+
+**Test MediaMTX (when configured):**
+```bash
+telnet rtsp.pinenut.tech 8554
+# Should connect to mediamtx container
+```
+
+**Test HAProxy Stats:**
+```
+http://your-vps-ip:8404/haproxy_stats
+Username: admin
+Password: [what you set in config]
+```
+
+---
+
+### Step 3A.8: Future Service Addition
+
+**To add a new service later:**
+
+1. **Create container:**
+```bash
+   lxc launch ubuntu:22.04 newservice
+   lxc list newservice  # Note the IP
+```
+
+2. **Add to HAProxy config:**
+```bash
+   lxc exec haproxy -- nano /etc/haproxy/haproxy.cfg
+   
+   # Add frontend ACL:
+   acl host_newservice hdr(host) -i newservice.pinenut.tech
+   use_backend newservice-backend if host_newservice
+   
+   # Add backend:
+   backend newservice-backend
+       mode http
+       server newservice1 10.206.248.XX:80 check
+```
+
+3. **Restart HAProxy:**
+```bash
+   lxc exec haproxy -- systemctl restart haproxy
+```
+
+4. **Add DNS record:**
+   - Create A record: `newservice.pinenut.tech` → VPS IP
+
+---
+
+### Step 3A.9: HAProxy Monitoring Commands
+```bash
+# View real-time logs
+lxc exec haproxy -- tail -f /var/log/haproxy.log
+
+# Check backend status
+lxc exec haproxy -- bash
+echo "show stat" | socat stdio /run/haproxy/admin.sock
+
+# View current sessions
+echo "show sess" | socat stdio /run/haproxy/admin.sock
+
+# Test config before applying changes
+haproxy -c -f /etc/haproxy/haproxy.cfg
+
+# Reload without downtime (after config changes)
+systemctl reload haproxy
+```
+
+---
+
+### Step 3A.10: SSL Certificate Strategy
+
+**For TAK Server:**
+- ✅ Uses self-signed certificates (generated in Phase 4)
+- ✅ Mutual TLS authentication
+- ✅ HAProxy does TCP passthrough (no SSL termination)
+
+**For Web Services (web, NextCloud):**
+- Option A: Self-signed certificates in each container
+- Option B: Let's Encrypt at HAProxy (SSL termination)
+- Option C: Let's Encrypt in each container (passthrough)
+
+**Recommended for your setup:**
+- TAK Server: Self-signed (required for mutual TLS)
+- Web/NextCloud: Let's Encrypt in each container
+- HAProxy: TCP passthrough for all SSL traffic
+
+---
+
+## Continuing to Single-Service Setup...
+
+**If you're only running TAK Server** (no other services), skip to the original Step 3 configuration. Otherwise, use Step 3A above for your multi-service deployment.
+
+---
+
 ### Step 4: Test HAProxy Configuration
 ```bash
 # Test config syntax
