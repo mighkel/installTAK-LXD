@@ -684,13 +684,6 @@ This next guide covers:
 - Matches the VPS host user structure
 - Makes troubleshooting easier
 
-### Why PostgreSQL Inside the Container?
-
-- TAK Server expects local PostgreSQL by default
-- Simpler configuration
-- Container isolation protects the database
-- Easy to backup/snapshot entire stack together
-
 ### Container vs VM?
 
 This guide uses **containers** (not VMs) because:
