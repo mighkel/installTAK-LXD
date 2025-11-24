@@ -54,6 +54,7 @@ su - takadmin
 # Create working directory
 mkdir -p ~/takserver-install
 cd ~/takserver-install
+# THIS IS WHERE `lxc snapshot tak fresh-setup` WAS PRFORMED
 
 # Download TAK Server (replace with your File ID)
 gdown 1ABC123xyz456DEF -O takserver-5.5-RELEASE##_all.deb
@@ -102,15 +103,10 @@ cd /home/takadmin/takserver-install
 git clone https://github.com/mighkel/installTAK-LXD.git
 
 # Enter scripts directory
-cd installTAK-LXD/scripts
+cd installTAK-LXD
 
 # Verify script is present
-ls -lh installTAK-LXD-enhanced.sh
-
-# Move install script to installTAK-LXD directory
-cp installTAK-LXD-enhanced.sh ..
-cd ..
-
+ls -lh installTAK-LXD.sh
 
 ```
 
@@ -138,16 +134,16 @@ ls -lh
 ### 3.1 Make Script Executable
 ```bash
 # Make installTAK executable
-chmod +x installTAK-LXD-enhanced.sh
+chmod +x installTAK-LXD.sh
 
 # Verify permissions
-ls -lh installTAK-LXD-enhanced.sh
+ls -lh installTAK-LXD.sh
 ```
 
 ### 3.2 Run the Installation
 ```bash
 # Run installTAK with the .deb file
-sudo ./installTAK-LXD-enhanced.sh takserver-5.5-RELEASE##_all.deb
+sudo ./installTAK-LXD.sh takserver-5.5-RELEASE##_all.deb
 
 # The script will start installing prerequisites
 # This takes 5-10 minutes
