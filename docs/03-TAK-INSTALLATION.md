@@ -56,10 +56,16 @@ mkdir -p ~/takserver-install
 cd ~/takserver-install
 
 # Download TAK Server (replace with your File ID)
-gdown 1ABC123xyz456DEF -O takserver-5.5-RELEASE.deb
+gdown 1ABC123xyz456DEF -O takserver-5.5-RELEASE[##]_all.deb
 
 # Download GPG key (replace with your File ID)
 gdown 1XYZ789abc123GHI -O takserver-public-gpg.key
+
+# Download Debian Policy file (replace with your File ID)
+gdown 1XYZ789abc123GHI -O deb_policy.pol
+
+# Optional: Download Federation Hub (replace with your File ID)
+gdown 1XYZ789abc123GHI -O takserver-fed-hub_5.5-RELEASE[##]_all.deb
 
 # Verify files downloaded
 ls -lh
@@ -92,27 +98,31 @@ The installTAK script automates the TAK Server installation process.
 # Inside container as takadmin
 cd /home/takadmin/takserver-install
 
-# Clone the installTAK repository
-git clone https://github.com/myTeckNet/installTAK.git
+# Clone the installTAK-LXD repository
+git clone https://github.com/myTeckNet/installTAK-LXD.git
 
-# Enter directory
-cd installTAK
+# Enter scripts directory
+cd installTAK-LXD/scripts
 
 # Verify script is present
-ls -lh installTAK
+ls -lh installTAK-LXD
+
+# Move install script to installTAK-LXD directory
+cp installTAK-LXD-enhanced.sh ..
+
 ```
 
 ### 2.2 Move TAK Files into installTAK Directory
 ```bash
 # Move TAK Server files into installTAK directory
-mv ../takserver-5.5-RELEASE.deb .
+mv ../takserver-5.5-RELEASE[##]_all.deb .
 mv ../takserver-public-gpg.key .
 
 # Verify all required files are present
 ls -lh
 
 # Should show:
-# - installTAK (script)
+# - installTAK-LXD-enhanced (script)
 # - takserver-5.5-RELEASE.deb
 # - takserver-public-gpg.key
 ```
@@ -126,16 +136,16 @@ ls -lh
 ### 3.1 Make Script Executable
 ```bash
 # Make installTAK executable
-chmod +x installTAK
+chmod +x installTAK-LXD-enhanced.sh
 
 # Verify permissions
-ls -lh installTAK
+ls -lh installTAK-LXD-enhanced.sh
 ```
 
 ### 3.2 Run the Installation
 ```bash
 # Run installTAK with the .deb file
-sudo ./installTAK takserver-5.5-RELEASE.deb
+sudo ./installTAK-LXD-enhanced.sh takserver-5.5-RELEASE[##]_all.deb
 
 # The script will start installing prerequisites
 # This takes 5-10 minutes
