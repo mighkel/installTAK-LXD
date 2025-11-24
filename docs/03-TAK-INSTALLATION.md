@@ -25,7 +25,7 @@ Before starting Phase 3, verify:
 ## Step 1: Obtain TAK Server Files
 
 You need these files from [TAK.gov](https://tak.gov/products/tak-server):
-- `takserver-5.5-RELEASE.deb` (or latest version)
+- `takserver-5.5-RELEASE##_all.deb` (or latest version)
 - `takserver-public-gpg.key`
 
 ### Method A: Google Drive + gdown (Recommended)
@@ -56,7 +56,7 @@ mkdir -p ~/takserver-install
 cd ~/takserver-install
 
 # Download TAK Server (replace with your File ID)
-gdown 1ABC123xyz456DEF -O takserver-5.5-RELEASE[##]_all.deb
+gdown 1ABC123xyz456DEF -O takserver-5.5-RELEASE##_all.deb
 
 # Download GPG key (replace with your File ID)
 gdown 1XYZ789abc123GHI -O takserver-public-gpg.key
@@ -65,7 +65,7 @@ gdown 1XYZ789abc123GHI -O takserver-public-gpg.key
 gdown 1XYZ789abc123GHI -O deb_policy.pol
 
 # Optional: Download Federation Hub (replace with your File ID)
-gdown 1XYZ789abc123GHI -O takserver-fed-hub_5.5-RELEASE[##]_all.deb
+gdown 1XYZ789abc123GHI -O takserver-fed-hub_5.5-RELEASE##_all.deb
 
 # Verify files downloaded
 ls -lh
@@ -115,7 +115,7 @@ cp installTAK-LXD-enhanced.sh ..
 ### 2.2 Move TAK Files into installTAK Directory
 ```bash
 # Move TAK Server files into installTAK directory
-mv ../takserver-5.5-RELEASE[##]_all.deb .
+mv ../takserver-5.5-RELEASE##_all.deb .
 mv ../takserver-public-gpg.key .
 
 # Verify all required files are present
@@ -145,7 +145,7 @@ ls -lh installTAK-LXD-enhanced.sh
 ### 3.2 Run the Installation
 ```bash
 # Run installTAK with the .deb file
-sudo ./installTAK-LXD-enhanced.sh takserver-5.5-RELEASE[##]_all.deb
+sudo ./installTAK-LXD-enhanced.sh takserver-5.5-RELEASE##_all.deb
 
 # The script will start installing prerequisites
 # This takes 5-10 minutes
