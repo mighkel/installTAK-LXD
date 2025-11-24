@@ -105,10 +105,12 @@ git clone https://github.com/mighkel/installTAK-LXD.git
 cd installTAK-LXD/scripts
 
 # Verify script is present
-ls -lh installTAK-LXD
+ls -lh installTAK-LXD-enhanced.sh
 
 # Move install script to installTAK-LXD directory
 cp installTAK-LXD-enhanced.sh ..
+cd ..
+
 
 ```
 
