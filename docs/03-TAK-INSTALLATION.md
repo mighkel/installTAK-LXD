@@ -99,7 +99,7 @@ The installTAK script automates the TAK Server installation process.
 cd /home/takadmin/takserver-install
 
 # Clone the installTAK-LXD repository
-git clone https://github.com/myTeckNet/installTAK-LXD.git
+git clone https://github.com/mighkel/installTAK-LXD.git
 
 # Enter scripts directory
 cd installTAK-LXD/scripts
