@@ -452,19 +452,48 @@ cat /opt/tak/CoreConfig.xml | grep -A 10 "<tls>"
 
 **Important:** You need to copy certificates out of the container for distribution to clients.
 
-### 8.1 Copy Enrollment Package to Host
-```bash
-# From the VPS host (NOT in container), run:
-lxc file pull tak/root/enrollmentDP.zip ~/enrollmentDP.zip
+### 8.1 Copy Certificates to Host
 
-# Verify
-ls -lh ~/enrollmentDP.zip
+After installation, certificates are created in the container. They may be in `/root/` or `/home/takadmin/` depending on the script.
+
+**Step 1: Locate certificates in container**
+```bash
+# From VPS host, check both locations
+lxc exec tak -- ls -lh /root/*.zip /root/*.p12 2>/dev/null
+lxc exec tak -- ls -lh /home/takadmin/*.zip /home/takadmin/*.p12 2>/dev/null
+```
+
+**Step 2: Pull certificates to host**
+
+Note: `lxc file pull` runs with sufficient privileges to pull files regardless of ownership, so you can pull directly from either location.
+
+**If files are in /root/:**
+```bash
+# Pull from /root/
+lxc file pull tak/root/enrollmentDP.zip ~/
+lxc file pull tak/root/enrollmentDP-QUIC.zip ~/
+lxc file pull tak/root/webadmin.p12 ~/
+lxc file pull tak/root/FedCA.pem ~/
+```
+
+**If files are in /home/takadmin/:**
+```bash
+# Pull from /home/takadmin/
+lxc file pull tak/home/takadmin/enrollmentDP.zip ~/
+lxc file pull tak/home/takadmin/enrollmentDP-QUIC.zip ~/
+lxc file pull tak/home/takadmin/webadmin.p12 ~/
+lxc file pull tak/home/takadmin/FedCA.pem ~/
+```
+
+**Step 3: Verify files on host**
+```bash
+ls -lh ~/*.zip ~/*.p12 ~/*.pem
 ```
 
 ### 8.2 Copy Web Admin Certificate
 ```bash
 # Copy webadmin.p12 to host
-lxc file pull tak/root/webadmin.p12 ~/webadmin.p12
+lxc file pull tak/home/takadmin/webadmin.p12 ~/
 
 # This certificate is needed to access TAK Server web UI
 ```
