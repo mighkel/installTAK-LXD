@@ -53,8 +53,8 @@ su - takadmin
 
 # Create working directory
 mkdir -p ~/takserver-install
-cd ~/takserver-install
 # THIS IS WHERE `lxc snapshot tak fresh-setup` WAS PRFORMED
+cd ~/takserver-install
 
 # Download TAK Server (replace with your File ID)
 gdown 1ABC123xyz456DEF -O takserver-5.5-RELEASE##_all.deb
