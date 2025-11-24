@@ -157,7 +157,226 @@ grep -i "postgres\|database" /opt/tak/logs/takserver-messaging.log | tail -20
 - `-bk` - Backup device
 - `-tr` - Training device
 
-### 2.2 Creating New User
+### 2.1.1 Two Methods for User Onboarding
+
+TAK Server supports two different methods for getting users connected. Understanding the difference is important.
+
+#### Method 1: Certificate Enrollment (Recommended for Most Agencies)
+
+**How it works:**
+1. Admin creates user in web UI with username/password
+2. Admin distributes enrollmentDP.zip + credentials to user
+3. User imports DP into ATAK, enters username/password
+4. ATAK requests certificate from server
+5. **Server automatically generates certificate** for user
+6. Certificate downloaded and installed in ATAK
+7. User connects (certificate-based from now on)
+
+**Advantages:**
+- ✅ Easy for users (just username/password initially)
+- ✅ Scalable (works great for 10-100+ users)
+- ✅ Self-service (users provision themselves)
+- ✅ No .p12 files to manually distribute
+- ✅ Certificates auto-created by server
+
+**Requirements:**
+- Port 8446 must be accessible to users
+- User authentication configured (UserAuthenticationFile.xml)
+- Enrollment enabled in CoreConfig.xml (default in installTAK)
+
+**When to use:**
+- Multiple users to onboard
+- Users not technically sophisticated
+- Want self-service provisioning
+- Have reliable network for enrollment
+
+**User receives:**
+- enrollmentDP.zip (or enrollmentDP-QUIC.zip)
+- Username: CCFIRE780
+- Password: [set in web UI]
+- Server URL: tak.pinenut.tech
+
+---
+
+#### Method 2: Pre-Generated Certificates (Manual Distribution)
+
+**How it works:**
+1. Admin creates certificate via CLI: `makeCert.sh client CCFIRE780`
+2. Admin creates matching user in web UI
+3. Admin securely distributes .p12 file to user
+4. User imports .p12 into ATAK
+5. User connects immediately (certificate IS the authentication)
+
+**Advantages:**
+- ✅ Maximum admin control
+- ✅ No passwords to manage
+- ✅ Works without enrollment port (8446)
+- ✅ Good for offline certificate generation
+- ✅ Certificate security fully in admin hands
+
+**Disadvantages:**
+- ⚠️ More admin work (create each cert individually)
+- ⚠️ Must securely distribute .p12 files
+- ⚠️ More complex for non-technical users
+- ⚠️ Doesn't scale as well for large groups
+
+**When to use:**
+- Small number of users (< 10)
+- High-security requirements
+- Enrollment port not accessible
+- Prefer manual certificate management
+- Users are technically sophisticated
+
+**User receives:**
+- CCFIRE780.p12 file
+- Certificate password: atakatak (or your password)
+- Server URL: tak.pinenut.tech
+- CA trust store (from enrollmentDP.zip)
+
+---
+
+#### Comparison Chart
+
+| Feature | Certificate Enrollment | Pre-Generated Certificates |
+|---------|----------------------|----------------------------|
+| **Admin creates cert?** | No (auto-generated) | Yes (via makeCert.sh) |
+| **User gets .p12 file?** | No (downloaded automatically) | Yes (manually distributed) |
+| **Username/password?** | Yes (for initial enrollment) | No (cert is authentication) |
+| **Scalability** | High (100+ users easy) | Low (manual work per user) |
+| **Port 8446 needed?** | Yes | No |
+| **User complexity** | Low (just username/password) | Medium (.p12 file management) |
+| **Admin workload** | Low (mostly automatic) | High (manual cert creation) |
+| **Security** | Good | Excellent (more control) |
+| **Best for** | Most agencies | Small groups, high security |
+
+---
+
+#### Which Method for CCVFD?
+
+**If you've been using enrollment successfully, continue with it!**
+
+Certificate enrollment is the standard approach for most agencies and works well for Clear Creek VFD's size. The sections below will describe both methods, but you can focus on the enrollment workflow (Section 2.2.1).
+
+---
+
+### 2.2 User Onboarding Workflows
+
+Choose the appropriate workflow based on your agency's needs. Most agencies use enrollment (2.2.1).
+
+#### 2.2.1 Creating User via Certificate Enrollment (Recommended)
+
+This is the standard method where users self-provision using username/password, and TAK Server automatically generates their certificate.
+
+**Step 1: Create User in Web UI**
+```
+1. Access: https://tak.pinenut.tech:8443
+2. Login with webadmin.p12
+3. User Manager → "Add User"
+4. Fill in:
+   - Username: CCFIRE780 (following naming convention)
+   - Password: [Create strong password] ← IMPORTANT for enrollment
+   - First Name: John
+   - Last Name: Smith
+   - Role: USER (or ADMIN for leadership)
+5. Add to appropriate groups:
+   - All Users (everyone)
+   - CCVFD Operations (or appropriate group)
+   - Additional groups as needed
+6. Save
+```
+
+**Step 2: Distribute Enrollment Package and Credentials**
+
+Give the user:
+- `enrollmentDP.zip` (or `enrollmentDP-QUIC.zip` if using QUIC)
+- Username: `CCFIRE780`
+- Password: `[password you set]`
+- Server URL: `tak.pinenut.tech`
+- Installation instructions
+
+**How to get enrollmentDP.zip:**
+```bash
+# Copy from container to host (if not already done)
+lxc file pull tak/home/takadmin/enrollmentDP.zip ~/
+
+# Download to your local machine
+scp takadmin@your-vps-ip:~/enrollmentDP.zip ./
+```
+
+**Step 3: User Enrollment Process (User does this)**
+
+**In ATAK:**
+```
+1. Transfer enrollmentDP.zip to Android device
+2. Open ATAK
+3. Tap hamburger menu (≡) → Settings
+4. Network → Certificate Enrollment
+5. Tap "Import Config"
+6. Select enrollmentDP.zip
+7. Enter Username: CCFIRE780
+8. Enter Password: [password from Step 1]
+9. Tap "Enroll"
+10. Wait 10-30 seconds
+11. Certificate automatically generated and installed
+12. ATAK automatically connects
+13. Green "Connected" status appears
+```
+
+**Behind the scenes:**
+- ATAK connects to port 8446 (enrollment port)
+- Sends username/password to TAK Server
+- TAK Server verifies credentials
+- TAK Server runs: `makeCert.sh client CCFIRE780` automatically
+- Certificate sent to ATAK encrypted
+- ATAK installs CCFIRE780.p12
+- Connection switches to port 8089 (cert-based auth)
+
+**Step 4: Verify User Connected**
+```
+1. Web UI → User Manager
+2. Find user: CCFIRE780
+3. Status should show "Connected" (green)
+4. Click username to see connection details
+5. Verify user can access expected missions
+```
+
+**Step 5: Document in Inventory**
+```
+Add to certificate inventory spreadsheet:
+- Username: CCFIRE780
+- Device: ATAK on Samsung tablet
+- Person: John Smith
+- Contact: (208)555-0780
+- Issued: 2025-11-24 (date enrolled)
+- Expires: 2027-11-24 (2 years)
+- Status: Active
+- Groups: All Users, CCVFD Operations
+- Role: USER
+- Method: Enrollment
+```
+
+**Troubleshooting Enrollment:**
+
+**User gets "Enrollment failed":**
+- Verify username/password correct (case-sensitive!)
+- Check port 8446 is accessible from user's network
+- Check TAK Server logs: `lxc exec tak -- tail -f /opt/tak/logs/takserver-api.log`
+- Verify user exists in web UI with correct password
+
+**User gets "Connection failed" after enrollment:**
+- Certificate may not have installed properly
+- Check ATAK → Settings → Network → Manage SSL/TLS Certificates
+- Should see CCFIRE780 certificate listed
+- If missing, retry enrollment
+
+**Enrollment works but can't see missions:**
+- User enrolled successfully but not in right groups
+- Web UI → User Manager → CCFIRE780 → Edit groups
+- Add to appropriate groups
+
+---
+
+#### 2.2.2 Creating User via Pre-Generated Certificates (Manual Method)
 
 **Prerequisites:**
 - Username decided (follow naming convention)
@@ -166,7 +385,9 @@ grep -i "postgres\|database" /opt/tak/logs/takserver-messaging.log | tail -20
 - Device type
 - Intended access level (which groups)
 
-**Step 1: Create Certificate**
+**Important:** TAK Server requires BOTH a certificate (created via CLI) AND a user entry (created in web UI). The certificate provides authentication, while the user entry provides authorization (groups, roles, permissions). **The names must match exactly.**
+
+**Step 1: Create Certificate (CLI)**
 ```bash
 # Get shell in container
 lxc exec tak -- bash
@@ -177,6 +398,7 @@ cd /opt/tak/certs
 sudo ./makeCert.sh client CCFIRE780
 
 # Certificate created: /opt/tak/certs/files/CCFIRE780.p12
+# This creates a certificate with CN=CCFIRE780
 ```
 
 **Step 2: Copy Certificate to Host**
@@ -187,39 +409,85 @@ exit
 # From VPS host
 lxc file pull tak/opt/tak/certs/files/CCFIRE780.p12 ~/CCFIRE780.p12
 
+# Verify
+ls -lh ~/CCFIRE780.p12
+
 # Download to your local machine
 scp takadmin@your-vps-ip:~/CCFIRE780.p12 ./
 ```
 
-**Step 3: Create User in Web UI**
+**Step 3: Create Matching User in Web UI**
+```
+CRITICAL: Username must EXACTLY match certificate name (case-sensitive)
+
 1. Access: https://tak.pinenut.tech:8443
 2. Login with webadmin.p12
 3. User Manager → "Add User"
 4. Fill in:
-   - Username: `CCFIRE780` (must match certificate)
-   - Password: (for enrollment - if using enrollment)
-   - First Name: `[User's first name]`
-   - Last Name: `[User's last name]`
-   - Role: `USER` (or `ADMIN` for admins)
-5. Add to appropriate groups (see Group Management)
+   - Username: CCFIRE780 (MUST match cert name exactly)
+   - Password: (leave blank - not needed for cert-based auth)
+   - First Name: John
+   - Last Name: Smith
+   - Role: USER (or ADMIN for leadership)
+5. Add to appropriate groups:
+   - All Users (everyone gets this)
+   - CCVFD Operations (or appropriate group)
+   - Additional groups as needed
 6. Save
+```
+
+**How They Connect:**
+```
+When user connects with CCFIRE780.p12:
+1. Certificate presents CN=CCFIRE780 to TAK Server
+2. TAK Server looks up user "CCFIRE780" in database
+3. Finds match → Grants access with assigned groups/role
+4. User sees missions based on group membership
+```
+
+**Common Mistakes:**
+- ❌ Cert: CCFIRE780.p12, User: CCFIRE-780 (hyphen) → No match, connection fails
+- ❌ Cert: ccfire780.p12, User: CCFIRE780 (case) → No match, connection fails
+- ❌ Cert: CCFIRE780.p12, User: not created → Connection fails (no authorization)
 
 **Step 4: Distribute Certificate**
 - Send CCFIRE780.p12 to user
 - Send certificate password: `atakatak` (or your password)
 - Send installation instructions
-- Send enrollment package (enrollmentDP.zip) if using enrollment
+- Inform user which groups they're in
 
 **Step 5: Document in Inventory**
 Add to certificate inventory spreadsheet:
 - Username: CCFIRE780
 - Device: ATAK on Samsung tablet
-- Person: Fire Chief John Smith
+- Person: John Smith
 - Contact: (208)555-0780
 - Issued: 2025-11-24
 - Expires: 2027-11-24
 - Status: Active
-- Groups: Fire Operations, Leadership, All Users
+- Groups: All Users, CCVFD Operations
+- Role: USER
+
+**Step 6: Verify User Can Connect**
+After user imports certificate:
+1. Check Web UI → User Manager
+2. Look for CCFIRE780
+3. Status should show "Connected" when user is online
+4. Verify user can access expected missions
+
+**Note: Auto-User Creation**
+
+If you skip Step 3 (creating user in web UI), TAK Server may automatically create the user when they first connect, depending on your CoreConfig.xml settings. However, auto-created users:
+- Have default permissions only
+- Not assigned to any groups (except maybe "All Users")
+- Have USER role (not ADMIN)
+- Require manual group assignment after creation
+
+**Best Practice:** Always create the user in web UI BEFORE distributing certificate. This ensures:
+- ✅ Groups assigned before first connection
+- ✅ Role set correctly (USER vs ADMIN)
+- ✅ User has proper access immediately
+- ✅ No delay waiting for admin to fix permissions
 
 ### 2.3 Multi-Device User Setup
 
