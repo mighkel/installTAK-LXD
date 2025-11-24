@@ -121,8 +121,20 @@ ls -lh
 
 # Should show:
 # - installTAK-LXD-enhanced (script)
-# - takserver-5.5-RELEASE.deb
+# - takserver_5.5-RELEASE##_all.deb
 # - takserver-public-gpg.key
+```
+
+### 2.3 Run the Pre-Flight Check script
+```bash
+# Make installTAK executable
+chmod +x preflight-check.sh
+
+# Verify permissions
+ls -lh preflight-check.sh
+
+# Run the pref-flight check script
+sudo ./preflight-check.sh
 ```
 
 ---
@@ -143,7 +155,7 @@ ls -lh installTAK-LXD.sh
 ### 3.2 Run the Installation
 ```bash
 # Run installTAK with the .deb file
-sudo ./installTAK-LXD.sh takserver-5.5-RELEASE##_all.deb
+sudo ./installTAK-LXD.sh takserver_5.5-RELEASE##_all.deb
 
 # The script will start installing prerequisites
 # This takes 5-10 minutes
