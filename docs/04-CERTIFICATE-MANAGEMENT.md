@@ -1756,4 +1756,4 @@ This guide covers:
 *Last Updated: November 2025*  
 *Tested on: TAK Server 5.5 in LXD container*  
 *Certificate Tools: OpenSSL 3.x, Java Keytool 17*  
-*Deployment: Clear Creek VFD / Boise County SO*
+*Deployment: Clear Creek VFD*
