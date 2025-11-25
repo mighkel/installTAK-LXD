@@ -432,7 +432,7 @@ PostgreSQL (in TAK container)
 
 ## Contact and Attribution
 
-**Deployment:** Clear Creek VFD / Boise County SO  
+**Deployment:** Clear Creek VFD  
 **Tested By:** Mike (mighkel)  
 **TAK Server Version:** 5.5-RELEASE-58  
 **LXD Version:** 5.x  
