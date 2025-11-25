@@ -1504,4 +1504,4 @@ Optional but recommended: Replace self-signed certificates with Let's Encrypt fo
 *Last Updated: November 24, 2025*  
 *Tested on: Ubuntu 22.04/24.04 LTS*  
 *HAProxy Version: 2.4+*  
-*Deployment: Clear Creek VFD / Boise County SO*
+*Deployment: Clear Creek VFD*
