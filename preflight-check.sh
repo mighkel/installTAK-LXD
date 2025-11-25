@@ -61,7 +61,8 @@ fi
 echo ""
 echo "Checking for required TAK Server files..."
 
-TAK_DEB=$(ls takserver-*.deb 2>/dev/null | head -n 1)
+# Check for both naming patterns: takserver-*.deb and takserver_*.deb
+TAK_DEB=$(ls takserver*.deb 2>/dev/null | head -n 1)
 if [ -n "$TAK_DEB" ]; then
     echo -e "  TAK Server .deb: ${GREEN}✅ Found ($TAK_DEB)${NC}"
 else

@@ -53,6 +53,7 @@ su - takadmin
 
 # Create working directory
 mkdir -p ~/takserver-install
+# THIS IS WHERE `lxc snapshot tak fresh-setup` WAS PRFORMED
 cd ~/takserver-install
 
 # Download TAK Server (replace with your File ID)
@@ -102,15 +103,10 @@ cd /home/takadmin/takserver-install
 git clone https://github.com/mighkel/installTAK-LXD.git
 
 # Enter scripts directory
-cd installTAK-LXD/scripts
+cd installTAK-LXD
 
 # Verify script is present
-ls -lh installTAK-LXD-enhanced.sh
-
-# Move install script to installTAK-LXD directory
-cp installTAK-LXD-enhanced.sh ..
-cd ..
-
+ls -lh installTAK-LXD.sh
 
 ```
 
@@ -125,8 +121,20 @@ ls -lh
 
 # Should show:
 # - installTAK-LXD-enhanced (script)
-# - takserver-5.5-RELEASE.deb
+# - takserver_5.5-RELEASE##_all.deb
 # - takserver-public-gpg.key
+```
+
+### 2.3 Run the Pre-Flight Check script
+```bash
+# Make installTAK executable
+chmod +x preflight-check.sh
+
+# Verify permissions
+ls -lh preflight-check.sh
+
+# Run the pref-flight check script
+sudo ./preflight-check.sh
 ```
 
 ---
@@ -138,16 +146,16 @@ ls -lh
 ### 3.1 Make Script Executable
 ```bash
 # Make installTAK executable
-chmod +x installTAK-LXD-enhanced.sh
+chmod +x installTAK-LXD.sh
 
 # Verify permissions
-ls -lh installTAK-LXD-enhanced.sh
+ls -lh installTAK-LXD.sh
 ```
 
 ### 3.2 Run the Installation
 ```bash
 # Run installTAK with the .deb file
-sudo ./installTAK-LXD-enhanced.sh takserver-5.5-RELEASE##_all.deb
+sudo ./installTAK-LXD.sh takserver_5.5-RELEASE##_all.deb
 
 # The script will start installing prerequisites
 # This takes 5-10 minutes
@@ -444,19 +452,48 @@ cat /opt/tak/CoreConfig.xml | grep -A 10 "<tls>"
 
 **Important:** You need to copy certificates out of the container for distribution to clients.
 
-### 8.1 Copy Enrollment Package to Host
-```bash
-# From the VPS host (NOT in container), run:
-lxc file pull tak/root/enrollmentDP.zip ~/enrollmentDP.zip
+### 8.1 Copy Certificates to Host
 
-# Verify
-ls -lh ~/enrollmentDP.zip
+After installation, certificates are created in the container. They may be in `/root/` or `/home/takadmin/` depending on the script.
+
+**Step 1: Locate certificates in container**
+```bash
+# From VPS host, check both locations
+lxc exec tak -- ls -lh /root/*.zip /root/*.p12 2>/dev/null
+lxc exec tak -- ls -lh /home/takadmin/*.zip /home/takadmin/*.p12 2>/dev/null
+```
+
+**Step 2: Pull certificates to host**
+
+Note: `lxc file pull` runs with sufficient privileges to pull files regardless of ownership, so you can pull directly from either location.
+
+**If files are in /root/:**
+```bash
+# Pull from /root/
+lxc file pull tak/root/enrollmentDP.zip ~/
+lxc file pull tak/root/enrollmentDP-QUIC.zip ~/
+lxc file pull tak/root/webadmin.p12 ~/
+lxc file pull tak/root/FedCA.pem ~/
+```
+
+**If files are in /home/takadmin/:**
+```bash
+# Pull from /home/takadmin/
+lxc file pull tak/home/takadmin/enrollmentDP.zip ~/
+lxc file pull tak/home/takadmin/enrollmentDP-QUIC.zip ~/
+lxc file pull tak/home/takadmin/webadmin.p12 ~/
+lxc file pull tak/home/takadmin/FedCA.pem ~/
+```
+
+**Step 3: Verify files on host**
+```bash
+ls -lh ~/*.zip ~/*.p12 ~/*.pem
 ```
 
 ### 8.2 Copy Web Admin Certificate
 ```bash
 # Copy webadmin.p12 to host
-lxc file pull tak/root/webadmin.p12 ~/webadmin.p12
+lxc file pull tak/home/takadmin/webadmin.p12 ~/
 
 # This certificate is needed to access TAK Server web UI
 ```
