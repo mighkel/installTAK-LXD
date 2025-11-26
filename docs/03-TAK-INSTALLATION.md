@@ -8,6 +8,36 @@ This guide assumes you've completed:
 
 ---
 
+## Document Conventions
+
+See [Phase 1: LXD Setup](01-LXD-SETUP.md#document-conventions) for the full conventions guide.
+
+**Quick Reference:**
+| Symbol | Meaning |
+|--------|---------|
+| 🖥️ | **VPS Host** - Commands run on the VPS via SSH (outside containers) |
+| 📦 | **Inside Container** - Commands run inside an LXD container |
+| ⚠️ | **User Configuration Required** - Replace placeholder values |
+
+**Where Am I? (Check Your Prompt)**
+| Prompt Looks Like | You Are |
+|-------------------|---------|
+| `takadmin@your-vps:~$` | 🖥️ VPS Host |
+| `root@tak:~#` | 📦 Inside container (as root) |
+| `takadmin@tak:~$` | 📦 Inside container (as takadmin) |
+
+**Placeholders used in this document:**
+- `[YOUR_DOMAIN]` - Your TAK server FQDN (e.g., `tak.example.com`)
+- `[YOUR_ORG]` - Your organization name (e.g., `Example Fire Dept`)
+- `[YOUR_STATE]` - Your state/province (e.g., `Colorado`)
+- `[YOUR_CITY]` - Your city (e.g., `Denver`)
+- `[YOUR_UNIT]` - Your organizational unit (e.g., `Communications`)
+- `[YOUR_CA_NAME]` - Root CA name (e.g., `YOURORG-ROOT-CA`)
+- `[##]` - TAK Server release number (e.g., `58`)
+- `[CONTAINER_IP]` - Container's internal IP from `lxc list`
+
+---
+
 ## Prerequisites
 
 Before starting Phase 3, verify:
@@ -16,19 +46,35 @@ Before starting Phase 3, verify:
 - [ ] takadmin user exists with sudo access
 - [ ] Fresh snapshot created: `lxc snapshot tak fresh-setup`
 
-**Critical: Have your passwords ready!**
-- takadmin user password
-- Certificate password (default: `atakatak` or your chosen password)
+> ⛔ **CRITICAL: Have your information ready!**
+> - takadmin user password
+> - Your organization details (for certificates)
+> - Your domain name (FQDN)
+> - Certificate password (default: `atakatak` or choose your own)
 
 ---
 
 ## Step 1: Obtain TAK Server Files
 
 You need these files from [TAK.gov](https://tak.gov/products/tak-server):
-- `takserver-5.5-RELEASE##_all.deb` (or latest version)
+- `takserver-5.5-RELEASE[##]_all.deb` (or latest version)
 - `takserver-public-gpg.key`
+- `deb_policy.pol` (security policy file)
+
+> ⚠️ **TAK SERVER FILE NAMING**
+> TAK Server files include a release number that changes with each build:
+> ```
+> takserver-5.5-RELEASE[##]_all.deb
+>                      ^^^
+>                      Release number (e.g., 58, 59, 60...)
+> ```
+> **Use the EXACT filename you downloaded.** File names are case-sensitive.
+>
+> 💡 **NOTE:** The 5.5 release used `-` before the version (`takserver-5.5-...`) which may differ from other versions. Always verify your actual filename.
 
 ### Method A: Google Drive + gdown (Recommended)
+
+📦 **Inside Container** (as takadmin)
 
 **Setup (one-time):**
 
@@ -38,12 +84,13 @@ You need these files from [TAK.gov](https://tak.gov/products/tak-server):
    - Change to "Anyone with the link"
    - Copy the link
 3. **Extract the File ID** from the URL:
-```
+   ```
    https://drive.google.com/file/d/1ABC123xyz456DEF/view?usp=sharing
                                     ↑ This is your File ID ↑
-```
+   ```
 
 **Download to container:**
+
 ```bash
 # Get shell in container
 lxc exec tak -- bash
@@ -53,36 +100,42 @@ su - takadmin
 
 # Create working directory
 mkdir -p ~/takserver-install
-# THIS IS WHERE `lxc snapshot tak fresh-setup` WAS PRFORMED
 cd ~/takserver-install
 
-# Download TAK Server (replace with your File ID)
-gdown 1ABC123xyz456DEF -O takserver-5.5-RELEASE##_all.deb
+# Download TAK Server (replace FILE_ID with your actual ID)
+gdown 1ABC123xyz456DEF -O takserver-5.5-RELEASE[##]_all.deb
 
-# Download GPG key (replace with your File ID)
+# Download GPG key (replace FILE_ID with your actual ID)
 gdown 1XYZ789abc123GHI -O takserver-public-gpg.key
 
-# Download Debian Policy file (replace with your File ID)
-gdown 1XYZ789abc123GHI -O deb_policy.pol
-
-# Optional: Download Federation Hub (replace with your File ID)
-gdown 1XYZ789abc123GHI -O takserver-fed-hub_5.5-RELEASE##_all.deb
+# Download policy file (replace FILE_ID with your actual ID)
+gdown 1JKL456mno789PQR -O deb_policy.pol
 
 # Verify files downloaded
 ls -lh
 ```
 
+> ⚠️ **USER CONFIGURATION REQUIRED**
+> - Replace each `1ABC...` file ID with your actual Google Drive file IDs
+> - Replace `[##]` with your actual release number (e.g., `58`)
+
+> 💡 **SECURITY TIP**
+> After downloading, go back to Google Drive and **remove sharing** (set files back to "Restricted"). TAK Server files should not remain publicly accessible.
+
 ### Method B: Manual Transfer (Alternative)
 
-**From your local machine:**
-```bash
-# Step 1: Copy files to VPS host
-scp takserver-5.5-RELEASE.deb takadmin@your-vps-ip:~/
-scp takserver-public-gpg.key takadmin@your-vps-ip:~/
+💻 **Local Machine** → 🖥️ **VPS Host** → 📦 **Container**
 
-# Step 2: From VPS, push to container
-lxc file push ~/takserver-5.5-RELEASE.deb tak/home/takadmin/takserver-install/
+```bash
+# Step 1: From local machine, copy files to VPS host
+scp takserver-5.5-RELEASE[##]_all.deb takadmin@[YOUR_VPS_IP]:~/
+scp takserver-public-gpg.key takadmin@[YOUR_VPS_IP]:~/
+scp deb_policy.pol takadmin@[YOUR_VPS_IP]:~/
+
+# Step 2: From VPS host, push to container
+lxc file push ~/takserver-5.5-RELEASE[##]_all.deb tak/home/takadmin/takserver-install/
 lxc file push ~/takserver-public-gpg.key tak/home/takadmin/takserver-install/
+lxc file push ~/deb_policy.pol tak/home/takadmin/takserver-install/
 
 # Step 3: Verify in container
 lxc exec tak -- ls -lh /home/takadmin/takserver-install/
@@ -94,72 +147,75 @@ lxc exec tak -- ls -lh /home/takadmin/takserver-install/
 
 The installTAK script automates the TAK Server installation process.
 
+📦 **Inside Container** (as takadmin)
+
 ### 2.1 Clone the Repository
+
 ```bash
-# Inside container as takadmin
 cd /home/takadmin/takserver-install
 
-# Clone the installTAK-LXD repository
-git clone https://github.com/mighkel/installTAK-LXD.git
+# Clone the installTAK repository
+git clone https://github.com/myTeckNet/installTAK.git
 
-# Enter scripts directory
-cd installTAK-LXD
+# Enter directory
+cd installTAK
 
 # Verify script is present
-ls -lh installTAK-LXD.sh
-
+ls -lh installTAK
 ```
 
 ### 2.2 Move TAK Files into installTAK Directory
+
 ```bash
 # Move TAK Server files into installTAK directory
-mv ../takserver-5.5-RELEASE##_all.deb .
+mv ../takserver-5.5-RELEASE[##]_all.deb .
 mv ../takserver-public-gpg.key .
+mv ../deb_policy.pol .
 
 # Verify all required files are present
 ls -lh
 
 # Should show:
-# - installTAK-LXD-enhanced (script)
-# - takserver_5.5-RELEASE##_all.deb
+# - installTAK (script)
+# - takserver-5.5-RELEASE[##]_all.deb
 # - takserver-public-gpg.key
+# - deb_policy.pol
 ```
 
-### 2.3 Run the Pre-Flight Check script
-```bash
-# Make installTAK executable
-chmod +x preflight-check.sh
-
-# Verify permissions
-ls -lh preflight-check.sh
-
-# Run the pref-flight check script
-sudo ./preflight-check.sh
-```
+> ⚠️ **USER CONFIGURATION REQUIRED**
+> Replace `[##]` with your actual release number in the mv command.
 
 ---
 
 ## Step 3: Run installTAK Script
 
-**Important:** Read through the prompts section below BEFORE running the script!
+> ⛔ **IMPORTANT: Read Step 4 BEFORE running the script!**
+> Step 4 explains all the prompts you'll encounter. Review it first so you know what to enter.
+
+📦 **Inside Container** (as takadmin)
 
 ### 3.1 Make Script Executable
+
 ```bash
 # Make installTAK executable
-chmod +x installTAK-LXD.sh
+chmod +x installTAK
 
 # Verify permissions
-ls -lh installTAK-LXD.sh
+ls -lh installTAK
 ```
 
 ### 3.2 Run the Installation
+
 ```bash
 # Run installTAK with the .deb file
-sudo ./installTAK-LXD.sh takserver_5.5-RELEASE##_all.deb
+sudo ./installTAK takserver-5.5-RELEASE[##]_all.deb
 
 # The script will start installing prerequisites
 # This takes 5-10 minutes
 ```
+
+> ⚠️ **USER CONFIGURATION REQUIRED**
+> Replace `[##]` with your actual release number.
 
 ---
 
@@ -168,23 +224,32 @@ sudo ./installTAK-LXD.sh takserver_5.5-RELEASE##_all.deb
 The installTAK script will ask several questions. Here's what to answer:
 
 ### 4.1 Certificate Organization Information
+
 ```
 Enter your State (e.g., California): 
-→ Idaho
+→ [YOUR_STATE]
 
 Enter your City (e.g., San Francisco): 
-→ Idaho City
+→ [YOUR_CITY]
 
 Enter your Organizational Unit (e.g., IT Department): 
-→ Communications
+→ [YOUR_UNIT]
 
 Enter your Organization (e.g., ACME Corp): 
-→ Clear Creek VFD
+→ [YOUR_ORG]
 ```
 
-**Note:** Use your actual organization info. These appear in certificates.
+> ⚠️ **USER CONFIGURATION REQUIRED**
+> Enter YOUR actual organization information. These appear in certificates.
+> 
+> **Example:**
+> - State: `Colorado`
+> - City: `Denver`
+> - Organizational Unit: `Communications`
+> - Organization: `Mountain View Fire Dept`
 
 ### 4.2 Certificate Password
+
 ```
 The default certificate password is 'atakatak'. 
 Do you want to change it? (y/n): 
@@ -197,25 +262,37 @@ Confirm your new certificate password:
 → [enter same password again]
 ```
 
-**CRITICAL:** Write this password down! You'll need it for:
-- Importing certificates into ATAK/WinTAK
-- Accessing TAK web UI
-- Certificate management
+> ⛔ **CRITICAL: DOCUMENT THIS PASSWORD!**
+> You'll need it for:
+> - Importing certificates into ATAK/WinTAK
+> - Accessing TAK web UI
+> - Certificate management
+>
+> Store it in your password manager now.
 
 ### 4.3 Certificate Authority Names
+
 ```
 Enter your Root Certificate Authority (CA) name 
 (or press Enter to generate a random name): 
-→ [Enter your name, e.g., CCVFD-ROOT-CA]
+→ [YOUR_CA_NAME]-ROOT-CA
 
 Enter your Intermediate Certificate Authority (CA) name 
 (or press Enter to generate a random name): 
-→ [Enter your name, e.g., CCVFD-INTERMEDIATE-CA]
+→ [YOUR_CA_NAME]-INTERMEDIATE-CA
 ```
 
-**Tip:** Use descriptive names that match your organization.
+> ⚠️ **USER CONFIGURATION REQUIRED**
+> Use descriptive names that match your organization.
+> 
+> **Example:**
+> - Root CA: `MVFD-ROOT-CA`
+> - Intermediate CA: `MVFD-INTERMEDIATE-CA`
+>
+> 💡 **TIP:** Use a short abbreviation of your organization (e.g., MVFD for Mountain View Fire Dept).
 
 ### 4.4 Certificate Enrollment
+
 ```
 Do you want to enable Certificate Enrollment? (y/n): 
 → y
@@ -225,17 +302,19 @@ Continue? (y/n):
 → y
 ```
 
-**What this does:** Allows ATAK clients to request certificates automatically.
+**What this does:** Allows ATAK clients to request certificates automatically instead of manually distributing .p12 files.
 
 ### 4.5 TAK Federation
+
 ```
 Do you want to enable TAK Server Federation? (y/n): 
 → n  (unless you're federating with other TAK Servers)
 ```
 
-**Note:** Federation connects multiple TAK Servers. Not needed for single-server deployments.
+> 💡 **NOTE:** Federation connects multiple TAK Servers together. Not needed for single-server deployments. You can enable this later if needed.
 
 ### 4.6 Connection Protocol
+
 ```
 Select connection protocol:
 1) SSL/TLS (default)
@@ -248,6 +327,7 @@ Enter your choice (1 or 2):
 **Stick with SSL/TLS** - QUIC support is experimental.
 
 ### 4.7 Certificate Enrollment Features
+
 ```
 Which features do you want to enable for certificate enrollment?
 - Certificate requests only
@@ -259,17 +339,22 @@ Enter your choice:
 ```
 
 ### 4.8 FQDN Configuration
+
 ```
 Does this TAK Server have a Fully Qualified Domain Name (FQDN)? (y/n): 
 → y
 
 Enter the FQDN for this TAK Server: 
-→ tak.pinenut.tech  (use your actual domain)
+→ [YOUR_DOMAIN]
 ```
 
-**Important:** This must match your DNS record!
+> ⚠️ **USER CONFIGURATION REQUIRED**
+> Enter YOUR actual domain name (e.g., `tak.example.com`).
+> 
+> **This must match your DNS record!** If you haven't set up DNS yet, use the domain you plan to use.
 
 ### 4.9 Certificate Trust Method
+
 ```
 How will this TAK Server be trusted?
 1) Local (self-signed)
@@ -279,25 +364,28 @@ Enter your choice (1 or 2):
 → 1  (for now - Let's Encrypt comes in Phase 5)
 ```
 
-**Why Local for now:** We'll set up Let's Encrypt in the networking phase after confirming basic connectivity works.
+> 💡 **WHY LOCAL FOR NOW?**
+> We'll set up Let's Encrypt in Phase 5 after confirming basic connectivity works. Self-signed certificates work perfectly for TAK clients (ATAK/WinTAK).
 
 ### 4.10 IP Address Confirmation
+
 ```
-TAK Server IP Address detected: 10.206.248.11
+TAK Server IP Address detected: [CONTAINER_IP]
 Is this correct? (y/n): 
 → y
 ```
 
-This is the container's internal IP - that's correct.
+This is the container's internal IP - that's correct. External access is configured in Phase 5.
 
 ### 4.11 Final Confirmation
+
 ```
 Review your configuration:
 
-Organization: Clear Creek VFD
-City: Idaho City
-State: Idaho
-Domain: tak.pinenut.tech
+Organization: [YOUR_ORG]
+City: [YOUR_CITY]
+State: [YOUR_STATE]
+Domain: [YOUR_DOMAIN]
 Certificate Password: atakatak
 Enrollment: Enabled
 
@@ -306,6 +394,9 @@ Is this correct? (y/n):
 ```
 
 **Review carefully!** Once confirmed, installation proceeds.
+
+> 💡 **PASSWORD RECOMMENDATION**
+> If you kept the default password `atakatak`, consider changing it for production use. See [Important Notes: Certificate Password Default](#certificate-password-default) below for details.
 
 ---
 
@@ -343,7 +434,10 @@ TAK Server is running on:
 
 ## Step 6: Verify TAK Server Installation
 
+📦 **Inside Container**
+
 ### 6.1 Check TAK Server Status
+
 ```bash
 # Check if TAK Server is running
 sudo systemctl status takserver
@@ -361,6 +455,7 @@ sudo systemctl start takserver
 ```
 
 ### 6.2 Verify PostgreSQL Database
+
 ```bash
 # Switch to postgres user
 sudo su - postgres
@@ -377,6 +472,7 @@ exit
 ```
 
 ### 6.3 Check TAK Server Ports
+
 ```bash
 # Verify TAK Server is listening on required ports
 sudo netstat -tlnp | grep java
@@ -395,6 +491,7 @@ tcp6  0  0 :::8446  :::*  LISTEN  12345/java
 ```
 
 ### 6.4 Test SSL Certificate
+
 ```bash
 # Test SSL handshake on port 8089
 openssl s_client -connect localhost:8089 -showcerts
@@ -402,15 +499,18 @@ openssl s_client -connect localhost:8089 -showcerts
 # Press Ctrl+C after seeing certificate info
 
 # Look for:
-# - subject=CN=tak.pinenut.tech (your domain)
-# - issuer=CN=CCVFD-INTERMEDIATE-CA (your intermediate CA)
+# - subject=CN=[YOUR_DOMAIN]
+# - issuer=CN=[YOUR_CA_NAME]-INTERMEDIATE-CA
 ```
 
 ---
 
 ## Step 7: Locate Important Files
 
+📦 **Inside Container**
+
 ### 7.1 Certificate Files Location
+
 ```bash
 # Certificate files are in:
 cd /opt/tak/certs/files
@@ -427,6 +527,7 @@ ls -lh
 ```
 
 ### 7.2 Enrollment Package
+
 ```bash
 # Enrollment package for ATAK clients
 ls -lh /root/enrollmentDP.zip
@@ -435,14 +536,15 @@ ls -lh /root/enrollmentDP.zip
 ```
 
 ### 7.3 Configuration Files
+
 ```bash
 # Main TAK Server configuration
 cat /opt/tak/CoreConfig.xml
 
-# Database configuration
+# View database configuration
 cat /opt/tak/CoreConfig.xml | grep -A 5 "<connection>"
 
-# Certificate configuration
+# View certificate configuration
 cat /opt/tak/CoreConfig.xml | grep -A 10 "<tls>"
 ```
 
@@ -450,71 +552,59 @@ cat /opt/tak/CoreConfig.xml | grep -A 10 "<tls>"
 
 ## Step 8: Copy Certificates to Host
 
-**Important:** You need to copy certificates out of the container for distribution to clients.
+> ⛔ **IMPORTANT**
+> You need to copy certificates out of the container for distribution to clients.
 
-### 8.1 Copy Certificates to Host
+🖥️ **VPS Host** (exit container first - may need `exit` twice)
 
-After installation, certificates are created in the container. They may be in `/root/` or `/home/takadmin/` depending on the script.
+### 8.1 Verify You're on VPS Host
 
-**Step 1: Locate certificates in container**
 ```bash
-# From VPS host, check both locations
-lxc exec tak -- ls -lh /root/*.zip /root/*.p12 2>/dev/null
-lxc exec tak -- ls -lh /home/takadmin/*.zip /home/takadmin/*.p12 2>/dev/null
+hostname
+# Should output your VPS hostname, NOT 'tak'
 ```
 
-**Step 2: Pull certificates to host**
+### 8.2 Copy Enrollment Package to Host
 
-Note: `lxc file pull` runs with sufficient privileges to pull files regardless of ownership, so you can pull directly from either location.
-
-**If files are in /root/:**
 ```bash
-# Pull from /root/
-lxc file pull tak/root/enrollmentDP.zip ~/
-lxc file pull tak/root/enrollmentDP-QUIC.zip ~/
-lxc file pull tak/root/webadmin.p12 ~/
-lxc file pull tak/root/FedCA.pem ~/
+lxc file pull tak/root/enrollmentDP.zip ~/enrollmentDP.zip
+
+# Verify
+ls -lh ~/enrollmentDP.zip
 ```
 
-**If files are in /home/takadmin/:**
-```bash
-# Pull from /home/takadmin/
-lxc file pull tak/home/takadmin/enrollmentDP.zip ~/
-lxc file pull tak/home/takadmin/enrollmentDP-QUIC.zip ~/
-lxc file pull tak/home/takadmin/webadmin.p12 ~/
-lxc file pull tak/home/takadmin/FedCA.pem ~/
-```
+### 8.3 Copy Web Admin Certificate
 
-**Step 3: Verify files on host**
-```bash
-ls -lh ~/*.zip ~/*.p12 ~/*.pem
-```
-
-### 8.2 Copy Web Admin Certificate
 ```bash
 # Copy webadmin.p12 to host
-lxc file pull tak/home/takadmin/webadmin.p12 ~/
+lxc file pull tak/root/webadmin.p12 ~/webadmin.p12
 
 # This certificate is needed to access TAK Server web UI
 ```
 
-### 8.3 Copy to Your Local Machine
+### 8.4 Copy to Your Local Machine
+
+💻 **Local Machine**
+
 ```bash
-# From your local machine (Windows/Mac/Linux)
-scp takadmin@your-vps-ip:~/enrollmentDP.zip ./
-scp takadmin@your-vps-ip:~/webadmin.p12 ./
+# From your local machine (not VPS)
+scp takadmin@[YOUR_VPS_IP]:~/enrollmentDP.zip ./
+scp takadmin@[YOUR_VPS_IP]:~/webadmin.p12 ./
 ```
+
+> ⚠️ **USER CONFIGURATION REQUIRED**
+> Replace `[YOUR_VPS_IP]` with your actual VPS IP address.
 
 ---
 
 ## Step 9: Create Post-Install Snapshot
 
-**Now that TAK Server is installed, create another snapshot!**
-```bash
-# Exit container
-exit
+🖥️ **VPS Host**
 
-# From VPS host, create snapshot
+**Now that TAK Server is installed, create another snapshot!**
+
+```bash
+# Create snapshot
 lxc snapshot tak tak-installed
 
 # List snapshots
@@ -529,11 +619,17 @@ lxc info tak | grep -A 10 Snapshots
 
 ## Step 10: CRITICAL - Restart TAK Server
 
-**This is the most commonly missed step!**
+> ⛔ **This is the most commonly missed step!**
 
 After installation completes, **ALWAYS restart TAK Server** to ensure all configurations are loaded:
+
+📦 **Inside Container**
+
 ```bash
-# In the container
+# Get back into container
+lxc exec tak -- bash
+
+# Restart TAK Server
 sudo systemctl restart takserver
 
 # Wait 30 seconds for full restart
@@ -570,15 +666,21 @@ Before moving to Phase 4, verify all these:
 **SSL/TLS:**
 - [ ] `openssl s_client -connect localhost:8089` succeeds
 - [ ] Certificate subject matches your FQDN
-- [ ] Certificate chain is valid
+- [ ] Certificate chain shows your CA names
 
 **Snapshots:**
 - [ ] Snapshot `tak-installed` created
-- [ ] Can list snapshots with `lxc info tak`
 
 ### Quick Verification Script
 
-Save as `verify-tak-install.sh` on VPS host:
+🖥️ **VPS Host**
+
+Create the script:
+```bash
+nano verify-tak-install.sh
+```
+
+Paste the following:
 ```bash
 #!/bin/bash
 echo "=== TAK Server Installation Verification ==="
@@ -614,7 +716,7 @@ echo ""
 echo "If all checks show ✅, proceed to Phase 4: Certificate Management"
 ```
 
-**Run it:**
+Save and exit (Ctrl+X, Y, Enter), then run:
 ```bash
 chmod +x verify-tak-install.sh
 ./verify-tak-install.sh
@@ -625,6 +727,8 @@ chmod +x verify-tak-install.sh
 ## Troubleshooting
 
 ### Issue: TAK Server won't start
+
+📦 **Inside Container**
 
 **Check the logs:**
 ```bash
@@ -651,31 +755,24 @@ java -version  # Must be 17.x
 
 ### Issue: Ports not listening
 
-**Check if TAK Server is actually running:**
 ```bash
+# Check if TAK Server is actually running
 ps aux | grep takserver
 
 # If not running, check why:
 sudo journalctl -u takserver -n 50
 ```
 
-**Check port bindings:**
-```bash
-sudo netstat -tlnp | grep -E "8089|8443|8446"
-```
-
 ### Issue: PostgreSQL errors
 
-**Verify PostgreSQL is running:**
 ```bash
+# Verify PostgreSQL is running
 sudo systemctl status postgresql
 
 # If not running:
 sudo systemctl start postgresql
-```
 
-**Check if TAK database exists:**
-```bash
+# Check if TAK database exists
 sudo su - postgres
 psql -l | grep cot
 exit
@@ -683,19 +780,21 @@ exit
 
 ### Issue: SSL certificate errors
 
-**Regenerate certificates:**
 ```bash
+# Regenerate certificates
 cd /opt/tak/certs
 sudo ./makeRootCa.sh
-sudo ./makeCert.sh server tak.pinenut.tech
+sudo ./makeCert.sh server [YOUR_DOMAIN]
 
 # CRITICAL: Restart TAK Server after cert changes!
 sudo systemctl restart takserver
 ```
 
+> ⚠️ **USER CONFIGURATION REQUIRED**
+> Replace `[YOUR_DOMAIN]` with your actual domain.
+
 ### Issue: Can't find enrollment package
 
-**Enrollment package location:**
 ```bash
 # Check these locations:
 ls -lh /root/enrollmentDP.zip
@@ -709,11 +808,10 @@ sudo ./makeEnrollmentPackage.sh
 
 ### Issue: Installation script failed midway
 
+🖥️ **VPS Host**
+
 **Restore from snapshot and try again:**
 ```bash
-# Exit container
-exit
-
 # Stop container
 lxc stop tak
 
@@ -740,7 +838,7 @@ The default certificate password is `atakatak`. If you didn't change it during i
 - Accessing web UI
 - Certificate management
 
-**For production, you should change this!**
+**For production, consider changing this!**
 
 ### File Ownership
 
@@ -767,7 +865,7 @@ After installTAK completes, you have:
 1. **TAK Server 5.5** - Running as systemd service
 2. **PostgreSQL 15** - Database backend
 3. **Certificate Authority** - Root and Intermediate CAs
-4. **Server Certificate** - For tak.pinenut.tech
+4. **Server Certificate** - For your domain
 5. **Admin Certificates** - For web UI access
 6. **Enrollment Package** - For ATAK client provisioning
 
@@ -791,9 +889,9 @@ This next guide covers:
 ## Additional Resources
 
 - **installTAK Repository:** https://github.com/myTeckNet/installTAK
-- **TAK Server Documentation:** https://tak.gov/docs
+- **TAK Server Documentation:** https://tak.gov/products/tak-server
 - **myTeckNet TAK Guides:** https://mytecknet.com/tag/tak/
-- **TAK Syndicate Forums:** https://tak.gov/community
+- **TAK Syndicate:** https://www.thetaksyndicate.org/
 
 ---
 
