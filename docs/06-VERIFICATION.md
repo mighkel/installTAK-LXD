@@ -6,6 +6,32 @@ This is the final phase! You'll verify that everything works end-to-end.
 
 ---
 
+## Document Conventions
+
+See [Phase 1: LXD Setup](01-LXD-SETUP.md#document-conventions) for the full conventions guide.
+
+**Quick Reference:**
+| Symbol | Meaning |
+|--------|---------|
+| 💻 | **Local Machine** - Your Windows/Mac/Linux workstation |
+| 🖥️ | **VPS Host** - Commands run on the VPS via SSH (outside containers) |
+| 📦 | **Inside Container** - Commands run inside an LXD container |
+| ⚠️ | **User Configuration Required** - Replace placeholder values |
+
+**Placeholders used in this document:**
+- `[YOUR_DOMAIN]` - Your TAK server FQDN (e.g., `tak.example.com`)
+- `[YOUR_VPS_IP]` - Your VPS public IP address
+- `[USERNAME]` - TAK user account name (e.g., `jsmith`)
+- `[CERT_PASSWORD]` - Your certificate password (default: `atakatak`)
+- `[YOUR_ORG]` - Your organization name
+
+> 💡 **PLACEHOLDER SYNTAX**
+> Replace the brackets AND the text inside with your actual value.
+> Example: `[YOUR_DOMAIN]` becomes `tak.example.com`
+> (Keep any surrounding quotes, remove the brackets)
+
+---
+
 ## Prerequisites
 
 Before starting Phase 6, verify all previous phases are complete:
@@ -24,6 +50,8 @@ Before starting Phase 6, verify all previous phases are complete:
 
 ### 1.1 Import Web Admin Certificate to Browser
 
+💻 **Local Machine**
+
 **Firefox:**
 1. Open Firefox
 2. Go to Settings (☰ menu → Settings)
@@ -32,7 +60,7 @@ Before starting Phase 6, verify all previous phases are complete:
 5. Click "Your Certificates" tab
 6. Click "Import"
 7. Select `webadmin.p12` file
-8. Enter password: `atakatak` (or your custom password)
+8. Enter password: `[CERT_PASSWORD]`
 9. Click OK
 
 **Chrome/Edge:**
@@ -46,15 +74,17 @@ Before starting Phase 6, verify all previous phases are complete:
 
 ### 1.2 Access Web UI
 
-**In your browser:**
+💻 **Local Machine** (in your browser)
+
+Navigate to:
 ```
-https://tak.pinenut.tech:8443
+https://[YOUR_DOMAIN]:8443
 ```
 
 **What you should see:**
 - Browser prompts you to select a certificate (choose webadmin)
 - TAK Server dashboard loads
-- No certificate errors (self-signed warning is normal)
+- No certificate errors (self-signed warning is normal without Let's Encrypt)
 
 **If you see SSL errors:**
 - Import the certificate again
@@ -69,24 +99,26 @@ Users need accounts for certificate enrollment.
 
 ### 2.1 Create User via Web UI
 
-1. In TAK Server web UI, click "User Manager" in left sidebar
-2. Click "Add User" button
+1. In TAK Server web UI, click **User Manager** in left sidebar
+2. Click **Add User** button
 3. Fill in user details:
-   - **Username:** `firefighter1`
+   - **Username:** `[USERNAME]` (e.g., `jsmith`)
    - **Password:** [choose strong password]
-   - **Role:** `ROLE_ADMIN` (for testing)
-4. Click "Create User"
+   - **Role:** `ROLE_ADMIN` (for testing, or `ROLE_USER` for regular users)
+4. Click **Create User**
 5. User appears in the list ✅
 
 ### 2.2 Create User via Command Line (Alternative)
+
+📦 **Inside TAK Container**
+
 ```bash
-# In TAK container
 lxc exec tak -- bash
 
 # Use UserManager tool
 cd /opt/tak
 sudo java -jar utils/UserManager.jar usermod \
-    -A -p [password] firefighter1
+    -A -p [password] [USERNAME]
 
 # Verify user created
 sudo java -jar utils/UserManager.jar userlist
@@ -104,31 +136,36 @@ exit
 **On Android device:**
 - ATAK installed (download from tak.gov or Google Play if civilian version)
 - Device has internet connectivity
-- Can reach tak.pinenut.tech (test in browser)
+- Can reach `[YOUR_DOMAIN]` (test in browser)
 
-### 3.2 Method A: Using Enrollment Package
+### 3.2 Method A: Using Enrollment Package (Recommended)
 
 **Step 1: Transfer enrollmentDP.zip to Android**
 - Email to yourself
 - Transfer via USB
 - Upload to cloud storage (Google Drive, NextCloud)
-- AirDrop (if iOS/Mac)
+- AirDrop (if iOS/Mac ecosystem)
 
 **Step 2: Import Enrollment Package in ATAK**
 
+**Import Option 1 (ATAK 5.4.0+):**
 1. Open ATAK
-2. Tap hamburger menu (☰) → Settings
-3. Scroll down to **Network Preferences** → **Manage Server Connections**
-4. Tap **Import** button (bottom)
-5. Navigate to `enrollmentDP.zip` and select it
-6. ATAK imports the configuration
-7. Connection appears as "CCVFD TAK Server" (or your configured name)
+2. Go to **Settings → Import → Local SD**
+3. Browse to `/Download/` folder
+4. Select `enrollmentDP.zip`
+5. Select **Copy files** option
+
+**Import Option 2 (ATAK 5.4.0+):**
+1. Open ATAK
+2. Go to **Settings → Network Preferences → Data Package**
+3. Browse to `/Download/` folder
+4. Select `enrollmentDP.zip`
 
 **Step 3: Enroll Certificate**
 
-1. Tap the imported connection
-2. Tap **Enroll**
-3. Enter username: `firefighter1`
+1. Go to **Settings → Network → Certificate Enrollment**
+2. Tap the imported server configuration
+3. Enter username: `[USERNAME]`
 4. Enter password: [password you set in Step 2]
 5. Tap **Enroll**
 6. Wait 10-30 seconds for certificate generation
@@ -144,19 +181,20 @@ exit
 
 If you created a certificate manually in Phase 4:
 
-1. Transfer `firefighter1.p12` to Android device
-2. ATAK → Settings → Network Preferences
-3. Tap **Import** (bottom)
-4. Select certificate or add manually:
-   - **Description:** CCVFD TAK Server
-   - **Address:** tak.pinenut.tech
-   - **Port:** 8089
-   - **Protocol:** SSL
-5. Tap "Manage SSL/TLS Certificates"
-6. Import client certificate: `firefighter1.p12`
-7. Password: `atakatak`
-8. Import CA certificate: Extract from enrollmentDP.zip → `truststore-root.p12`
-9. Save and connect
+1. Transfer `[USERNAME].p12` to Android device
+2. Open ATAK
+3. Go to **Settings → Network Preferences → Manage Server Connections**
+4. Tap **+** to add server
+5. Enter:
+   - **Description:** `[YOUR_ORG] TAK Server`
+   - **Address:** `[YOUR_DOMAIN]`
+   - **Port:** `8089`
+   - **Protocol:** `SSL`
+6. Tap **Manage SSL/TLS Certificates**
+7. Import client certificate (`[USERNAME].p12`)
+8. Enter certificate password: `[CERT_PASSWORD]`
+9. Import CA certificate (`truststore-root.p12` from enrollment package)
+10. Save and connect
 
 ---
 
@@ -168,19 +206,21 @@ Download WinTAK from tak.gov (requires account).
 
 ### 4.2 Import Certificate
 
+💻 **Local Machine**
+
 1. Launch WinTAK
 2. Click **Settings** (gear icon)
 3. Go to **Network Preferences** tab
 4. Click **Manage Server Connections**
 5. Click **Add** to create new connection
 6. Configure connection:
-   - **Description:** CCVFD TAK Server
-   - **Address:** `tak.pinenut.tech:8089:ssl`
+   - **Description:** `[YOUR_ORG] TAK Server`
+   - **Address:** `[YOUR_DOMAIN]:8089:ssl`
    - Check "Connect on startup"
 7. Under **Authentication** section:
    - Click **Browse** next to "Client Certificate"
-   - Select `firefighter1.p12`
-   - Enter password: `atakatak`
+   - Select `[USERNAME].p12`
+   - Enter password: `[CERT_PASSWORD]`
    - Click **Browse** next to "CA Certificate"
    - Select `truststore-root.p12` (extract from enrollmentDP.zip)
 8. Click **Apply**
@@ -188,7 +228,7 @@ Download WinTAK from tak.gov (requires account).
 
 ### 4.3 Verify Connection
 
-- Bottom-right corner shows: **Connected to CCVFD TAK Server**
+- Bottom-right corner shows: **Connected to [YOUR_ORG] TAK Server**
 - Green indicator appears
 - Console shows: `Connection established`
 
@@ -245,8 +285,10 @@ Download WinTAK from tak.gov (requires account).
 ## Step 6: Monitor Server Performance
 
 ### 6.1 Check TAK Server Status
+
+🖥️ **VPS Host**
+
 ```bash
-# From VPS host
 lxc exec tak -- systemctl status takserver
 
 # Should show: active (running)
@@ -255,13 +297,16 @@ lxc exec tak -- systemctl status takserver
 ### 6.2 Check Active Connections
 
 **Via Web UI:**
-1. Login to `https://tak.pinenut.tech:8443`
+1. Login to `https://[YOUR_DOMAIN]:8443`
 2. Dashboard shows:
    - Active clients
    - Messages per second
    - Uptime
 
 **Via Command Line:**
+
+📦 **Inside TAK Container**
+
 ```bash
 lxc exec tak -- bash
 
@@ -272,9 +317,12 @@ netstat -tnp | grep :8089
 ```
 
 ### 6.3 Monitor Logs
+
+📦 **Inside TAK Container**
+
 ```bash
 # Real-time log monitoring
-lxc exec tak -- tail -f /opt/tak/logs/takserver-messaging.log
+tail -f /opt/tak/logs/takserver-messaging.log
 
 # Look for:
 # - Client connection events
@@ -284,9 +332,10 @@ lxc exec tak -- tail -f /opt/tak/logs/takserver-messaging.log
 ```
 
 ### 6.4 Check PostgreSQL Database
-```bash
-lxc exec tak -- bash
 
+📦 **Inside TAK Container**
+
+```bash
 # Switch to postgres user
 sudo su - postgres
 
@@ -303,7 +352,6 @@ SELECT * FROM cot_router.client_endpoint;
 
 # Exit
 \q
-exit
 exit
 ```
 
@@ -324,6 +372,9 @@ exit
 3. Transfer files between clients
 
 **Monitor:**
+
+🖥️ **VPS Host**
+
 ```bash
 # Check CPU/memory usage
 lxc exec tak -- top
@@ -352,8 +403,10 @@ lxc exec tak -- top
 ## Step 8: Backup and Snapshot
 
 ### 8.1 Create Production-Ready Snapshot
+
+🖥️ **VPS Host**
+
 ```bash
-# From VPS host
 # Create final snapshot with working configuration
 lxc snapshot tak production-ready
 
@@ -367,6 +420,9 @@ lxc info tak | grep -A 20 Snapshots
 ```
 
 ### 8.2 Backup Important Files
+
+🖥️ **VPS Host**
+
 ```bash
 # Create backup directory
 mkdir -p ~/tak-backups/$(date +%Y%m%d)
@@ -393,13 +449,14 @@ ls -lh tak-backup-*.tar.gz
 
 ### 8.3 Store Backup Off-Server
 
-**Copy to your local machine:**
+💻 **Local Machine** (not VPS)
+
 ```bash
-# From local machine (not VPS)
-scp takadmin@your-vps-ip:~/tak-backups/tak-backup-*.tar.gz ./
+# Copy to your local machine
+scp takadmin@[YOUR_VPS_IP]:~/tak-backups/tak-backup-*.tar.gz ./
 
 # Or upload to cloud storage:
-# - Google Drive (via gdown or web interface)
+# - Google Drive (via web interface)
 # - NextCloud
 # - Encrypted USB drive
 ```
@@ -452,8 +509,10 @@ scp takadmin@your-vps-ip:~/tak-backups/tak-backup-*.tar.gz ./
 ## Step 10: Configure Auto-Start
 
 ### 10.1 Enable Container Auto-Start
+
+🖥️ **VPS Host**
+
 ```bash
-# From VPS host
 # TAK container auto-start on boot
 lxc config set tak boot.autostart true
 lxc config set tak boot.autostart.delay 10
@@ -467,17 +526,19 @@ lxc config show tak | grep autostart
 ```
 
 ### 10.2 Test Auto-Start
+
 ```bash
 # Reboot VPS to test
 sudo reboot
 
 # Wait 2 minutes, then reconnect
-ssh takadmin@your-vps-ip
+ssh takadmin@[YOUR_VPS_IP]
 
 # Check containers started automatically
 lxc list
 
 # Should show both containers RUNNING
+
 # Check TAK Server status
 lxc exec tak -- systemctl status takserver
 ```
@@ -487,17 +548,20 @@ lxc exec tak -- systemctl status takserver
 ## Step 11: Optional Monitoring Setup
 
 ### 11.1 Install Monitoring Tools (Optional)
+
+📦 **Inside TAK Container**
+
 ```bash
 # Install htop for better process monitoring
-lxc exec tak -- apt install -y htop
+apt install -y htop
 
 # Monitor in real-time
-lxc exec tak -- htop
+htop
 
 # Look for 'java' process (TAK Server)
 ```
 
-### 11.2 Set Up Email Alerts (Optional)
+### 11.2 Set Up External Monitoring (Optional)
 
 **For production deployments, consider:**
 - Uptime monitoring (UptimeRobot, Pingdom)
@@ -506,9 +570,18 @@ lxc exec tak -- htop
 - Discord/Slack webhooks for alerts
 
 ### 11.3 Simple Health Check Script
+
+🖥️ **VPS Host**
+
+Create the script:
+```bash
+nano check-tak-health.sh
+```
+
+Paste the following:
 ```bash
 #!/bin/bash
-# Save as check-tak-health.sh on VPS host
+# TAK Server Health Check Script
 
 echo "=== TAK Server Health Check ==="
 echo "Time: $(date)"
@@ -559,7 +632,7 @@ echo "📊 Memory usage: ${MEM_USAGE}%"
 echo "=== Health Check Complete ==="
 ```
 
-**Run health check:**
+Save and exit (Ctrl+X, Y, Enter), then run:
 ```bash
 chmod +x check-tak-health.sh
 ./check-tak-health.sh
@@ -580,22 +653,24 @@ crontab -e
 
 ### 12.1 Complete System Test
 
-1. **Reboot entire VPS:**
-```bash
-   sudo reboot
-```
+🖥️ **VPS Host**
 
-2. **Wait 3 minutes, reconnect:**
-```bash
-   ssh takadmin@your-vps-ip
-```
+1. **Reboot entire VPS:**
+   ```bash
+   sudo reboot
+   ```
+
+2. **Wait 3 minutes, then reconnect:**
+   ```bash
+   ssh takadmin@[YOUR_VPS_IP]
+   ```
 
 3. **Verify everything auto-started:**
-```bash
+   ```bash
    lxc list
    lxc exec tak -- systemctl status takserver
    lxc exec tak -- systemctl status postgresql
-```
+   ```
 
 4. **Test client connections:**
    - ATAK should reconnect automatically
@@ -603,18 +678,18 @@ crontab -e
    - Web UI should be accessible
 
 ### 12.2 Run All Verification Scripts
+
+🖥️ **VPS Host**
+
 ```bash
 # Phase 1 verification
 ./verify-lxd.sh
 
-# Phase 2 verification
+# Phase 2 verification (if created)
 ./verify-container.sh
 
-# Phase 3 verification
-./verify-tak-install.sh
-
 # Phase 5 verification
-./verify-network.sh
+./verify-networking.sh
 
 # Health check
 ./check-tak-health.sh
@@ -630,22 +705,22 @@ crontab -e
 
 **Check in order:**
 
-1. Container running?
-```bash
+1. **Container running?**
+   ```bash
    lxc list
-```
+   ```
 
-2. TAK Server running?
-```bash
+2. **TAK Server running?**
+   ```bash
    lxc exec tak -- systemctl status takserver
-```
+   ```
 
-3. Network accessible?
-```bash
-   openssl s_client -connect tak.pinenut.tech:8089
-```
+3. **Network accessible?**
+   ```bash
+   openssl s_client -connect [YOUR_DOMAIN]:8089
+   ```
 
-4. ATAK certificate valid?
+4. **ATAK certificate valid?**
    - Check certificate expiration
    - Re-enroll if needed
 
@@ -658,15 +733,17 @@ crontab -e
 
 ### Issue: Poor performance with multiple clients
 
+📦 **Inside TAK Container**
+
 **Increase Java heap size:**
 ```bash
-lxc exec tak -- nano /opt/tak/setenv.sh
+nano /opt/tak/setenv.sh
 
 # Increase -Xmx value:
 export JAVA_OPTS="-Xmx4096m"  # 4GB (adjust based on VPS RAM)
 
 # Restart TAK Server
-lxc exec tak -- systemctl restart takserver
+systemctl restart takserver
 ```
 
 ---
@@ -713,8 +790,7 @@ Your deployment is successful when:
 ### For Continued Learning:
 
 - **TAK Product Center:** https://tak.gov
-- **TAK Syndicate Forums:** Join the community
-- **myTeckNet Blog:** https://mytecknet.com/tag/tak/
+- **TAK Syndicate:** https://www.thetaksyndicate.org/
 - **CivTAK:** https://civtak.org
 
 ---
@@ -739,5 +815,4 @@ Your deployment is successful when:
 ---
 
 *Last Updated: November 2025*  
-*Deployment Status: Production Ready*  
-*Use Case: Emergency Services / Volunteer Fire Departments*
+*Deployment Status: Production Ready*
