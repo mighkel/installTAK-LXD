@@ -6,6 +6,38 @@ This guide assumes you've completed [Phase 1: LXD Setup](01-LXD-SETUP.md) and al
 
 ---
 
+## Document Conventions
+
+See [Phase 1: LXD Setup](01-LXD-SETUP.md#document-conventions) for the full conventions guide.
+
+**Quick Reference:**
+| Symbol | Meaning |
+|--------|---------|
+| 💻 | **Local Machine** - Your Windows/Mac/Linux workstation |
+| 🖥️ | **VPS Host** - Commands run on the VPS via SSH (outside containers) |
+| 📦 | **Inside Container** - Commands run inside an LXD container |
+| ⚠️ | **User Configuration Required** - Replace placeholder values |
+
+**Where Am I? (Check Your Prompt)**
+| Prompt Looks Like | You Are |
+|-------------------|---------|
+| `user@your-vps-name:~$` | 🖥️ VPS Host |
+| `root@tak:~#` | 📦 Inside container (as root) |
+| `takadmin@tak:~$` | 📦 Inside container (as takadmin) |
+
+> 💡 **TIP: Exiting Containers**  
+> If you're `takadmin@tak`, type `exit` twice to get back to VPS host:
+> 1. First `exit`: takadmin → root (still in container)
+> 2. Second `exit`: root in container → VPS host
+
+**Placeholders used in this document:**
+- `[YOUR_DOMAIN]` - Your TAK server domain (e.g., `tak.example.com`)
+- `[YOUR_VPS_IP]` - Your VPS public IP address
+- `[CONTAINER_IP]` - Container's internal IP (assigned by LXD, typically `10.x.x.x`)
+- `[##]` - TAK Server release number (e.g., `58` in `takserver-5.5-RELEASE58_all.deb`)
+
+---
+
 ## Prerequisites
 
 Before starting Phase 2, verify:
@@ -22,7 +54,10 @@ Before starting Phase 2, verify:
 
 ## Step 1: Create the TAK Container
 
+🖥️ **VPS Host**
+
 ### 1.1 Launch Ubuntu Container
+
 ```bash
 # Launch Ubuntu 22.04 container named 'tak'
 lxc launch ubuntu:22.04 tak
@@ -39,15 +74,19 @@ lxc list
 +------+---------+----------------------+------+------------+-----------+
 | NAME |  STATE  |         IPV4         | IPV6 |    TYPE    | SNAPSHOTS |
 +------+---------+----------------------+------+------------+-----------+
-| tak  | RUNNING | 10.206.248.11 (eth0) |      | CONTAINER  | 0         |
+| tak  | RUNNING | 10.x.x.x (eth0)      |      | CONTAINER  | 0         |
 +------+---------+----------------------+------+------------+-----------+
 ```
 
-**Note the IP address** - you'll need it later. In this example: `10.206.248.11`
+> ⚠️ **NOTE THE IP ADDRESS**  
+> Write down your container's IP (e.g., `10.x.x.x`). You'll need it for HAProxy configuration in Phase 5. This is your `[CONTAINER_IP]`.
 
 ### 1.2 Verify Container Networking
 
+🖥️ **VPS Host**
+
 **Critical: Test networking before proceeding!**
+
 ```bash
 # Test internet connectivity
 lxc exec tak -- ping -c 3 1.1.1.1
@@ -59,13 +98,16 @@ lxc exec tak -- ping -c 3 google.com
 lxc exec tak -- apt update
 ```
 
-**All three tests must succeed.** If any fail, stop and troubleshoot networking.
+**All three tests must succeed.** If any fail, stop and troubleshoot networking (see Phase 1 troubleshooting).
 
 ---
 
 ## Step 2: Initial Container Configuration
 
 ### 2.1 Access the Container
+
+🖥️ **VPS Host**
+
 ```bash
 # Get a shell in the container
 lxc exec tak -- bash
@@ -75,12 +117,12 @@ lxc exec tak -- bash
 ```
 
 ### 2.2 Update the Container
-```bash
-# Update package lists
-apt update
 
-# Upgrade all packages
-apt upgrade -y
+📦 **Inside Container**
+
+```bash
+# Update and upgrade packages
+apt update && apt upgrade -y
 
 # Install basic utilities
 apt install -y nano curl wget net-tools
@@ -90,19 +132,28 @@ apt autoremove -y
 ```
 
 ### 2.3 Set Container Timezone (Optional)
+
+📦 **Inside Container**
+
 ```bash
 # Check current timezone
 timedatectl
 
-# Set to your timezone (example: America/Boise)
-timedatectl set-timezone America/Boise
+# List available timezones
+timedatectl list-timezones | grep America
 
-# Or use UTC (recommended for servers)
+# Set to your timezone (example)
+timedatectl set-timezone America/Denver
+
+# Or use UTC (recommended for servers serving multiple timezones)
 # timedatectl set-timezone UTC
 
 # Verify
 date
 ```
+
+> ⚠️ **USER CONFIGURATION REQUIRED**  
+> Replace `America/Denver` with your actual timezone. Use `timedatectl list-timezones` to find yours.
 
 ---
 
@@ -110,7 +161,10 @@ date
 
 **Best Practice:** Don't run TAK Server as root inside the container.
 
+📦 **Inside Container**
+
 ### 3.1 Create takadmin User
+
 ```bash
 # Create user (still inside the container)
 adduser takadmin
@@ -131,19 +185,27 @@ usermod -aG sudo takadmin
 su - takadmin
 sudo whoami  # Should output: root
 
-# Exit back to root
+# Exit back to root (still inside container)
 exit
 ```
 
+> 💡 **WHERE ARE YOU NOW?**  
+> After this step, you should still be **root inside the container** (prompt: `root@tak:~#`).  
+> - One `exit` = back to root in container  
+> - Two `exit` commands = back to VPS host  
+> 
+> Stay inside the container for the next steps.
+
 ### 3.2 Document the Password
 
-**IMPORTANT:** Write this password down in your password manager or secure location!
-```bash
-# Container: tak
-# User: takadmin
-# Password: [your chosen password]
-# IP: [container IP from lxc list]
-```
+> ⛔ **CRITICAL: SAVE THIS PASSWORD**  
+> Store this password in a secure location (password manager recommended).
+> ```
+> Container: tak
+> User: takadmin
+> Password: [your chosen password]
+> IP: [CONTAINER_IP from lxc list]
+> ```
 
 ---
 
@@ -151,10 +213,11 @@ exit
 
 The installTAK script will handle PostgreSQL and Java installation automatically. We only need basic tools.
 
-### 4.1 Install Essential Utilities
-```bash
-# Still in the container as root
+📦 **Inside Container** (as root)
 
+### 4.1 Install Essential Utilities
+
+```bash
 # Install basic tools needed for installation
 apt install -y \
     wget \
@@ -175,17 +238,13 @@ which curl      # Should show path
 ```
 
 ### 4.2 Install gdown (for Google Drive file fetching)
-```bash
-# First, upgrade pip to latest version
-pip3 install --upgrade pip
 
-# Then install gdown
-pip3 install gdown
+```bash
+# Upgrade pip and install gdown
+pip3 install --upgrade pip && pip3 install gdown
 
 # Verify installation
 gdown --version
-
-# Expected output: gdown 5.2.0 (or similar)
 ```
 
 **Expected output:**
@@ -193,7 +252,8 @@ gdown --version
 gdown 5.2.0 at /usr/local/lib/python3.10/dist-packages
 ```
 
-**Note:** You may see warnings about running pip as root - these can be safely ignored in a container environment.
+> 💡 **TIP**  
+> You may see warnings about running pip as root - these can be safely ignored in a container environment. If gdown fails, try: `pip3 install gdown --break-system-packages`
 
 ---
 
@@ -206,7 +266,10 @@ The installTAK script will automatically install:
 - ✅ Database configuration
 - ✅ Firewall rules
 
+📦 **Inside Container**
+
 ### 5.1 Create Working Directory
+
 ```bash
 # Create directory for TAK installation files
 mkdir -p /home/takadmin/takserver-install
@@ -215,26 +278,44 @@ cd /home/takadmin/takserver-install
 # Set ownership
 chown -R takadmin:takadmin /home/takadmin/takserver-install
 ```
-**Alternative: Manual File Transfer**
+
+### 5.2 Alternative: Manual File Transfer
 
 If you prefer to manually transfer files instead of using gdown:
+
+> ⚠️ **TAK SERVER FILE NAMING**  
+> TAK Server files from tak.gov include a release number that changes with each build:
+> ```
+> takserver-5.5-RELEASE[##]_all.deb
+>                      ^^^
+>                      Release number (e.g., 58, 59, 60...)
+> ```
+> 
+> **Use the EXACT filename you downloaded.** File names are case-sensitive and must be verbatim.
+>
+> Example: `takserver-5.5-RELEASE58_all.deb`
+>
+> 💡 **NOTE:** The 5.5 release used `-` before the version (`takserver-5.5-...`) which differs from the typical convention (`takserver_5.5-...`). Always verify your actual filename.
+
+🖥️ **VPS Host** (not inside container)
+
 ```bash
-# From your local machine (NOT in the container):
-# Copy file to VPS host first
-scp takserver-5.5-RELEASE.deb takadmin@your-vps-ip:~/
+# Copy file to VPS host first (from your local machine)
+# scp takserver-5.5-RELEASE[##]_all.deb takadmin@[YOUR_VPS_IP]:~/
 
 # Then from VPS host, push to container
-lxc file push ~/takserver-5.5-RELEASE.deb tak/home/takadmin/takserver-install/
+lxc file push ~/takserver-5.5-RELEASE[##]_all.deb tak/home/takadmin/takserver-install/
 ```
 
-### 5.2 Verify Container is Ready
+> ⚠️ **USER CONFIGURATION REQUIRED**  
+> Replace `[##]` with your actual release number (e.g., `58`).
+
+### 5.3 Verify Container is Ready
+
+📦 **Inside Container**
 
 Before proceeding to Phase 3, verify:
-- [ ] Container has internet access
-- [ ] Basic utilities installed (git, wget, curl)
-- [ ] gdown is installed
-- [ ] takadmin user exists
-- [ ] Working directory created
+
 ```bash
 # Quick verification
 ping -c 3 1.1.1.1        # Internet works
@@ -243,34 +324,44 @@ gdown --version           # gdown installed
 id takadmin               # User exists
 ls -ld /home/takadmin/takserver-install  # Directory exists
 ```
+
 ---
 
 ## Step 6: Network Configuration Notes
 
 ### 6.1 Document Container IP
-```bash
-# From VPS host (not in container):
-lxc list tak
 
-# Note the IPv4 address - example: 10.206.248.11
+🖥️ **VPS Host**
+
+```bash
+# Get container IP
+lxc list tak -c n4
+
+# Note the IPv4 address - you'll need this for HAProxy configuration
 ```
 
 ### 6.2 Test Host-to-Container Connectivity
+
+🖥️ **VPS Host**
+
 ```bash
-# From VPS host, test connection to container
-ping -c 3 [container-ip]
+# Test connection to container
+ping -c 3 [CONTAINER_IP]
 
 # Example:
-ping -c 3 10.206.248.11
+# ping -c 3 10.177.85.22
 
 # Should succeed ✅
 ```
+
+> ⚠️ **USER CONFIGURATION REQUIRED**  
+> Replace `[CONTAINER_IP]` with your actual container IP from `lxc list`.
 
 ### 6.3 Plan Port Forwarding Strategy
 
 You'll need to decide how external traffic reaches containers on your VPS.
 
-### Understanding Your Deployment Type
+#### Understanding Your Deployment Type
 
 **Single Service Deployment:**
 - ONLY TAK Server running on the VPS
@@ -299,15 +390,13 @@ You'll need to decide how external traffic reaches containers on your VPS.
 - ✅ Simpler setup
 - ✅ Built into LXD
 - ✅ No additional container needed
-- ✅ Less configuration
 
 **Cons:**
 - ❌ Cannot handle multiple services well
 - ❌ No domain-based routing
 - ❌ Port conflicts with other services
-- ❌ Limited flexibility
 
-**Example (don't run yet):**
+**Example (don't run yet - configured in Phase 5):**
 ```bash
 # Forward TAK ports directly to container
 lxc config device add tak tak-8089 proxy \
@@ -317,119 +406,111 @@ lxc config device add tak tak-8089 proxy \
 
 ---
 
-### Option B: HAProxy (Multi-Service - RECOMMENDED for your use case)
+### Option B: HAProxy (Multi-Service - RECOMMENDED)
 
-**Use this if you're running:**
+**Use this if you're running (or might run):**
 - ✅ TAK Server
 - ✅ Web server (Apache/Nginx)
-- ✅ NextCloud
+- ✅ NextCloud or other file sharing
 - ✅ MediaMTX (RTSP streaming)
 - ✅ Any combination of services
 
 **Pros:**
 - ✅ Professional-grade load balancer
 - ✅ Route by domain/subdomain
-  - `tak.pinenut.tech` → TAK Server
-  - `web.pinenut.tech` → Web Server
-  - `files.pinenut.tech` → NextCloud
-  - `rtsp.pinenut.tech` → MediaMTX
 - ✅ Advanced health checks
-- ✅ Statistics dashboard
-- ✅ SSL/TLS termination options
 - ✅ Can share ports (80, 443) across services
 
 **Cons:**
 - ❌ More complex initial setup
 - ❌ Requires separate container
-- ❌ More configuration to maintain
 
-**Your Planned Architecture with HAProxy:**
+**Example Multi-Service Architecture:**
 ```
 Internet
     ↓
-VPS Public IP (104.225.221.119)
+VPS Public IP ([YOUR_VPS_IP])
     ↓
-HAProxy Container (10.206.248.12)
-    ├─→ tak.pinenut.tech:8089 → TAK Container (10.206.248.11:8089)
-    ├─→ web.pinenut.tech:80 → Web Container (10.206.248.13:80)
-    ├─→ files.pinenut.tech:443 → NextCloud Container (10.206.248.14:443)
-    └─→ rtsp.pinenut.tech:8554 → MediaMTX Container (10.206.248.15:8554)
+HAProxy Container ([HAPROXY_IP])
+    ├─→ tak.[YOUR_DOMAIN]:8089 → TAK Container ([CONTAINER_IP]:8089)
+    ├─→ web.[YOUR_DOMAIN]:80 → Web Container ([WEB_IP]:80)
+    ├─→ files.[YOUR_DOMAIN]:443 → NextCloud Container ([NC_IP]:443)
+    └─→ rtsp.[YOUR_DOMAIN]:8554 → MediaMTX Container ([MEDIA_IP]:8554)
 ```
 
----
-
-### Decision for Your Deployment
-
-**Based on your plans for:**
-- TAK Server ✅
-- Web server ✅
-- RTSP (MediaMTX) ✅
-- NextCloud ✅
-- Possible other services ✅
-
-**→ You MUST use HAProxy (Option B)**
-
-**Why:**
-- You have multiple services competing for standard ports
-- You need domain-based routing (tak.pinenut.tech vs files.pinenut.tech)
-- You want room to grow with additional services
-- Professional deployment requires proper reverse proxy
+> ⚠️ **USER CONFIGURATION REQUIRED**  
+> Replace all `[YOUR_DOMAIN]` and IP placeholders with your actual values.
 
 ---
 
-### What You'll Set Up in Phase 5
+### Making the Decision
 
-Phase 5 (Networking) will cover HAProxy setup including:
+**Choose LXD Proxy (Option A) if:**
+- This is a simple, single-purpose TAK Server
+- You don't plan to run other services
+- You want the simplest possible setup
 
-1. **Creating HAProxy container**
-2. **Configuring domain routing:**
-   - `tak.pinenut.tech:8089` → TAK Server (TCP passthrough)
-   - `tak.pinenut.tech:8443` → TAK Web UI (TCP passthrough)
-   - `web.pinenut.tech` → Your web server
-   - `files.pinenut.tech` → NextCloud
-   - `rtsp.pinenut.tech:8554` → MediaMTX
+**Choose HAProxy (Option B) if:**
+- You might add services later
+- You need domain-based routing
+- You want a professional, scalable setup
 
-3. **SSL/TLS handling:**
-   - TAK Server: Uses its own certificates (mutual TLS)
-   - Web services: Can use Let's Encrypt via HAProxy
-
-4. **Health monitoring and stats**
+> 💡 **RECOMMENDATION**  
+> Even if you're only running TAK Server now, **HAProxy is recommended** if you might add services later. It's easier to set up HAProxy from the start than to migrate later.
 
 ---
 
-### For Now
+### 6.4 Plan Your Container IPs (If Using HAProxy)
 
-**Note in your planning doc:**
-- ✅ Using HAProxy for multi-service deployment
-- ✅ Reserve container IPs:
-  - `10.206.248.11` - TAK Server
-  - `10.206.248.12` - HAProxy
-  - `10.206.248.13` - Web Server
-  - `10.206.248.14` - NextCloud
-  - `10.206.248.15` - MediaMTX
-- ✅ DNS records needed:
-  - `tak.pinenut.tech` → VPS IP
-  - `web.pinenut.tech` → VPS IP
-  - `files.pinenut.tech` → VPS IP
-  - (Optional: `rtsp.pinenut.tech` → VPS IP)
+🖥️ **VPS Host**
 
-**Phase 5 will provide complete HAProxy configuration for all your services.**
+Document your planned containers and IPs:
+
+```bash
+# List current container IPs
+lxc list -c n4
+
+# Example planning table:
+# +------------+---------------+------------------+
+# | Container  | Purpose       | IP (from lxc)    |
+# +------------+---------------+------------------+
+# | tak        | TAK Server    | 10.x.x.11        |
+# | haproxy    | Reverse Proxy | 10.x.x.12        |
+# | web        | Web Server    | (future)         |
+# | nextcloud  | File Sharing  | (future)         |
+# +------------+---------------+------------------+
+```
+
+> 💡 **TIP**  
+> Create a text file on your VPS to track container IPs:
+> ```bash
+> nano ~/container-ips.txt
+> ```
+
+**Phase 5 (Networking) will provide complete HAProxy configuration.**
 
 ---
 
 ## Step 7: Container Resource Limits (Optional)
 
-Set limits to prevent TAK Server from consuming all VPS resources.
+> 💡 **SKIP THIS STEP FOR MOST USERS**  
+> LXD containers share host resources by default, which works fine for most TAK Server deployments. Only configure limits if you know you need them.
+
+<details>
+<summary><strong>Advanced: Click to expand resource limit configuration</strong></summary>
+
+🖥️ **VPS Host**
 
 ### 7.1 Check Current Resource Usage
+
 ```bash
-# From VPS host:
 lxc info tak
 
 # Shows CPU, memory, and disk usage
 ```
 
 ### 7.2 Set CPU Limits
+
 ```bash
 # Limit to 2 CPU cores (adjust based on VPS size)
 lxc config set tak limits.cpu 2
@@ -439,6 +520,7 @@ lxc config get tak limits.cpu
 ```
 
 ### 7.3 Set Memory Limits
+
 ```bash
 # Set 4GB memory limit (adjust based on VPS RAM)
 lxc config set tak limits.memory 4GB
@@ -448,6 +530,7 @@ lxc config get tak limits.memory
 ```
 
 ### 7.4 Set Disk Limits
+
 ```bash
 # Set root disk size limit (optional)
 lxc config device override tak root size=60GB
@@ -455,6 +538,8 @@ lxc config device override tak root size=60GB
 # Verify
 lxc config show tak
 ```
+
+</details>
 
 ---
 
@@ -464,12 +549,27 @@ lxc config show tak
 
 This lets you rollback if something goes wrong.
 
+🖥️ **VPS Host**
+
 ### 8.1 Exit Container and Create Snapshot
+
+📦 **Inside Container** → 🖥️ **VPS Host**
+
 ```bash
-# If you're inside the container, exit first
+# Exit the container completely (may need to type 'exit' twice)
+# - If you're takadmin: exit → root → exit → VPS host
+# - If you're root: exit → VPS host
 exit
 
-# From VPS host, create snapshot
+# Verify you're on VPS host (prompt should NOT say 'root@tak')
+hostname
+# Should output your VPS hostname, NOT 'tak'
+```
+
+🖥️ **VPS Host**
+
+```bash
+# Create snapshot
 lxc snapshot tak fresh-setup
 
 # List snapshots
@@ -477,6 +577,7 @@ lxc info tak | grep -A 10 Snapshots
 ```
 
 ### 8.2 How to Restore from Snapshot (if needed)
+
 ```bash
 # Stop container
 lxc stop tak
@@ -520,7 +621,14 @@ Before moving to Phase 3 (TAK Installation), verify all these:
 
 ### Quick Verification Script
 
-Save this as `verify-container.sh` on your VPS host:
+🖥️ **VPS Host**
+
+Create the script:
+```bash
+nano verify-container.sh
+```
+
+Paste the following:
 ```bash
 #!/bin/bash
 echo "=== TAK Container Verification ==="
@@ -558,7 +666,7 @@ echo ""
 echo "Note: installTAK script will install PostgreSQL and Java automatically"
 ```
 
-**Run it:**
+Save and exit (Ctrl+X, Y, Enter), then run:
 ```bash
 chmod +x verify-container.sh
 ./verify-container.sh
@@ -569,6 +677,7 @@ chmod +x verify-container.sh
 ## Troubleshooting
 
 ### Issue: Container won't start
+
 ```bash
 # Check logs
 lxc info tak --show-log
@@ -580,50 +689,47 @@ lxc start tak --console
 ### Issue: apt update fails in container
 
 **Check DNS resolution:**
-```bash
-lxc exec tak -- cat /etc/resolv.conf
-# Should show nameserver (like 10.206.248.1)
 
-# If missing, restart container
-lxc restart tak
+📦 **Inside Container**
+```bash
+cat /etc/resolv.conf
+# Should show nameserver (like 10.x.x.1)
+
+# If missing or wrong, restart container from host:
 ```
 
-### Issue: PostgreSQL won't install
-
-**Check if old version is present:**
+🖥️ **VPS Host**
 ```bash
-lxc exec tak -- dpkg -l | grep postgres
-
-# Remove old versions if found
-lxc exec tak -- apt purge postgresql* -y
-lxc exec tak -- apt autoremove -y
-
-# Try installation again
+lxc restart tak
 ```
 
 ### Issue: Can't ping container from host
 
-**Check LXD network:**
+🖥️ **VPS Host**
 ```bash
+# Check LXD network
 lxc network show lxdbr0
 
 # Verify IPv4 address range matches container IP
 ```
 
 ### Issue: gdown not found after installation
+
+📦 **Inside Container**
 ```bash
 # Try installing with --break-system-packages
-lxc exec tak -- pip3 install gdown --break-system-packages
+pip3 install gdown --break-system-packages
 
-# Or use apt version
-lxc exec tak -- apt install python3-gdown -y
+# Or use apt version (if available)
+apt install python3-gdown -y
 ```
 
 ---
 
-## Container Management Commands
+## Container Management Quick Reference
 
-**Useful commands for managing your container:**
+🖥️ **VPS Host**
+
 ```bash
 # Start container
 lxc start tak
@@ -649,15 +755,12 @@ lxc file pull tak/home/takadmin/file.txt ./
 # View container config
 lxc config show tak
 
-# View container info, including snapshots
+# View container info (including snapshots)
 lxc info tak
 
-# List all snapshots
-lxc info tak | grep -A 20 Snapshots
-
 # Delete/restore snapshot
-lxc delete <container>/<snapshot>
-lxc restore <container> <snapshot>
+lxc delete tak/snapshot-name
+lxc restore tak snapshot-name
 
 # Delete container (CAREFUL!)
 # lxc stop tak && lxc delete tak
