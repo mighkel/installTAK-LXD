@@ -16,6 +16,15 @@ This guide covers setting up SSH key authentication from Windows, macOS, and Lin
 | 💡 | **Tip** - Helpful information |
 | ⛔ | **Critical** - Important warning |
 
+**Placeholders used in this document:**
+- `[YOUR_VPS_IP]` - Your VPS public IP address
+- `[YOUR_VPS_HOSTNAME]` - A short name for your VPS
+
+> 💡 **PLACEHOLDER SYNTAX**
+> Replace the brackets AND the text inside with your actual value.
+> Example: `[YOUR_VPS_IP]` becomes `203.0.113.50`
+> (Keep any surrounding quotes, remove the brackets)
+
 ---
 
 ## Why SSH Keys?
