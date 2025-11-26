@@ -36,6 +36,11 @@ See [Phase 1: LXD Setup](01-LXD-SETUP.md#document-conventions) for the full conv
 - `[##]` - TAK Server release number (e.g., `58`)
 - `[CONTAINER_IP]` - Container's internal IP from `lxc list`
 
+> 💡 **PLACEHOLDER SYNTAX**
+> Replace the brackets AND the text inside with your actual value.
+> Example: `[YOUR_DOMAIN]` becomes `tak.example.com`
+> (Keep any surrounding quotes, remove the brackets)
+
 ---
 
 ## Prerequisites
