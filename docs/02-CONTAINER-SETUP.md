@@ -649,11 +649,15 @@ lxc file pull tak/home/takadmin/file.txt ./
 # View container config
 lxc config show tak
 
-# View container info
+# View container info, including snapshots
 lxc info tak
 
 # List all snapshots
 lxc info tak | grep -A 20 Snapshots
+
+# Delete/restore snapshot
+lxc delete <container>/<snapshot>
+lxc restore <container> <snapshot>
 
 # Delete container (CAREFUL!)
 # lxc stop tak && lxc delete tak

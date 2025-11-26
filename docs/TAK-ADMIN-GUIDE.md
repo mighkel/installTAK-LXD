@@ -2218,4 +2218,4 @@ https://tak.pinenut.tech:8446         - Certificate enrollment
 *Last Updated: November 2025*  
 *Version: 1.0*  
 *For: TAK Server 5.5 in LXD containers*  
-*Agencies: Clear Creek VFD, Boise County SO*
+*Agencies: Clear Creek VFD*

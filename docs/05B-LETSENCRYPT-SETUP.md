@@ -1124,4 +1124,4 @@ Final steps to verify your complete TAK Server deployment.
 
 *Last Updated: November 24, 2025*  
 *Tested on: TAK Server 5.5, Ubuntu 22.04/24.04 LTS*  
-*Deployment: Clear Creek VFD / Boise County SO*
+*Deployment: Clear Creek VFD*
