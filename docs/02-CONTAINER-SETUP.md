@@ -36,6 +36,11 @@ See [Phase 1: LXD Setup](01-LXD-SETUP.md#document-conventions) for the full conv
 - `[CONTAINER_IP]` - Container's internal IP (assigned by LXD, typically `10.x.x.x`)
 - `[##]` - TAK Server release number (e.g., `58` in `takserver-5.5-RELEASE58_all.deb`)
 
+> 💡 **PLACEHOLDER SYNTAX**
+> Replace the brackets AND the text inside with your actual value.
+> Example: `[YOUR_VPS_IP]` becomes `203.0.113.50`
+> (Keep any surrounding quotes, remove the brackets)
+
 ---
 
 ## Prerequisites
