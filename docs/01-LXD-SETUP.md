@@ -19,11 +19,29 @@ Throughout this documentation, you'll see these indicators:
 | 💡 | **Tip** - Helpful information |
 | ⛔ | **Critical** - Important warning |
 
+**Where Am I? (Check Your Prompt)**
+| Prompt Looks Like | You Are |
+|-------------------|---------|
+| `C:\Users\you>` or `you@local:~$` | 💻 Local Machine |
+| `takadmin@your-vps:~$` | 🖥️ VPS Host |
+| `root@tak:~#` | 📦 Inside container (as root) |
+| `takadmin@tak:~$` | 📦 Inside container (as takadmin) |
+
+> 💡 **TIP: Exiting Containers**  
+> When inside a container, you may need `exit` twice to return to VPS host:
+> 1. First `exit`: non-root user → root (still in container)
+> 2. Second `exit`: container → VPS host
+
 **Placeholder Convention:**
 - `[YOUR_DOMAIN]` - Your registered domain (e.g., `tak.example.com`)
 - `[YOUR_VPS_IP]` - Your VPS public IP address (e.g., `203.0.113.50`)
 - `[YOUR_VPS_HOSTNAME]` - A short name for your VPS (e.g., `takvps`, `prodtak`)
 - `[YOUR_ORG]` - Your organization name
+
+> 💡 **PLACEHOLDER SYNTAX**
+> Replace the brackets AND the text inside with your actual value.
+> Example: `[YOUR_VPS_IP]` becomes `203.0.113.50`
+> (Keep any surrounding quotes, remove the brackets)
 
 ---
 
@@ -69,9 +87,7 @@ ssh username@[YOUR_VPS_IP]
 **Always start with system updates:**
 
 ```bash
-sudo apt update
-sudo apt upgrade -y
-sudo apt autoremove -y
+sudo apt update && sudo apt upgrade -y && sudo apt autoremove -y
 ```
 
 **Reboot if kernel was updated:**
