@@ -6,36 +6,68 @@ This is Phase 1 of the TAK Server LXD deployment. Complete this guide before pro
 
 ---
 
+## Document Conventions
+
+Throughout this documentation, you'll see these indicators:
+
+| Symbol | Meaning |
+|--------|---------|
+| 💻 | **Local Machine** - Commands run on your Windows/Mac/Linux workstation |
+| 🖥️ | **VPS Host** - Commands run on the VPS via SSH (outside any container) |
+| 📦 | **Container** - Commands run inside an LXD container |
+| ⚠️ | **User Configuration Required** - You must replace placeholder values |
+| 💡 | **Tip** - Helpful information |
+| ⛔ | **Critical** - Important warning |
+
+**Placeholder Convention:**
+- `[YOUR_DOMAIN]` - Your registered domain (e.g., `tak.example.com`)
+- `[YOUR_VPS_IP]` - Your VPS public IP address (e.g., `203.0.113.50`)
+- `[YOUR_VPS_HOSTNAME]` - A short name for your VPS (e.g., `takvps`, `prodtak`)
+- `[YOUR_ORG]` - Your organization name
+
+---
+
 ## Prerequisites
 
 ### What You Need
+
 - Fresh Ubuntu 22.04 or 24.04 LTS installation (minimal)
 - Root or sudo access
 - SSH access to your VPS
 - At least 4GB RAM, 2 vCPU, 80GB storage
 
-### VPS Providers Tested
-- ✅ SSDNodes
-- ✅ Linode
-- ✅ DigitalOcean
-- ✅ AWS EC2
+### VPS Providers
+
+- ✅ **SSDNodes** - Primary testing platform for this guide
+- ✅ **DigitalOcean** - Should work with minimal adaptation
+- ⚠️ **Linode** - Not tested, but standard Ubuntu VPS should work
+- ⚠️ **AWS EC2** - Not tested; AWS networking is more complex and may require additional configuration
 
 ---
 
 ## Step 1: Initial System Setup
 
 ### 1.1 Connect to Your VPS
+
+💻 **Local Machine**
+
 ```bash
 # From your local machine (Windows/Mac/Linux)
-ssh root@your-vps-ip
+ssh root@[YOUR_VPS_IP]
 
 # Or if using a non-root user:
-ssh username@your-vps-ip
+ssh username@[YOUR_VPS_IP]
 ```
+
+> ⚠️ **USER CONFIGURATION REQUIRED**  
+> Replace `[YOUR_VPS_IP]` with your actual VPS public IP address.
 
 ### 1.2 Update System
 
+🖥️ **VPS Host**
+
 **Always start with system updates:**
+
 ```bash
 sudo apt update
 sudo apt upgrade -y
@@ -43,6 +75,7 @@ sudo apt autoremove -y
 ```
 
 **Reboot if kernel was updated:**
+
 ```bash
 # Check if reboot is needed
 [ -f /var/run/reboot-required ] && echo "Reboot required" || echo "No reboot needed"
@@ -51,12 +84,20 @@ sudo apt autoremove -y
 sudo reboot
 
 # Wait 60 seconds, then reconnect
-ssh username@your-vps-ip
+```
+
+💻 **Local Machine**
+
+```bash
+ssh username@[YOUR_VPS_IP]
 ```
 
 ### 1.3 Create TAK Admin User (if not already done)
 
+🖥️ **VPS Host**
+
 **Best practice:** Don't run everything as root.
+
 ```bash
 # Create user
 sudo adduser takadmin
@@ -72,61 +113,38 @@ sudo whoami  # Should output: root
 exit
 ```
 
-**Set up SSH key for takadmin:**
-
-#### For Windows Users (PuTTY)
-
-**See detailed guide with screenshots:**  
-📘 [SSDNodes Host Setup and SSH Key Configuration](https://github.com/mighkel/TAK-Server/blob/main/ssdnodes_host_setup_and_ssh.md)
-
-**Quick summary:**
-1. Use **PuTTYgen** to generate SSH key pair
-2. Save private key as `.ppk` file (e.g., `takadmin-pinetech3.ppk`)
-3. Copy public key to VPS:
-```bash
-   # On VPS, as takadmin
-   mkdir -p ~/.ssh
-   chmod 700 ~/.ssh
-   nano ~/.ssh/authorized_keys
-   # Paste public key from PuTTYgen
-   chmod 600 ~/.ssh/authorized_keys
-```
-4. Configure PuTTY session with private key (Connection → SSH → Auth)
-5. Save session and test connection
-
-**Optional:** Use **Pageant** for passphrase management
-
 ---
 
-#### For Linux/Mac Users
-```bash
-# From your local machine (not VPS)
-ssh-keygen -t rsa -b 4096 -C "takadmin@pinetech3"
+## Step 2: Set Up SSH Key Authentication
 
-# Save to: ~/.ssh/takadmin-pinetech3
-# Enter passphrase (optional)
+SSH keys provide secure, passwordless authentication to your VPS.
 
-# Copy public key to VPS
-ssh-copy-id -i ~/.ssh/takadmin-pinetech3.pub takadmin@your-vps-ip
+### 2.1 For Windows Users (PuTTY Method)
 
-# Test passwordless login
-ssh -i ~/.ssh/takadmin-pinetech3 takadmin@your-vps-ip
-```
+> 💡 **DETAILED GUIDE AVAILABLE**  
+> For step-by-step instructions with screenshots, see [SSH Key Setup Guide](SSH-KEY-SETUP.md).
 
----
+💻 **Local Machine (Windows)**
 
-**Verify SSH Key Authentication Works:**
-```bash
-# Should connect without asking for password
-# (or only ask for passphrase if you set one)
+**Step 1: Generate SSH Key Pair**
 
-# Windows/PuTTY: Load saved session and click "Open"
-# Linux/Mac: ssh -i ~/.ssh/takadmin-pinetech3 takadmin@your-vps-ip
-```
+1. Download and install [PuTTY](https://www.putty.org/) (includes PuTTYgen and Pageant)
+2. Launch **PuTTYgen**
+3. Click "Generate" and move mouse randomly to generate entropy
+4. Once generated:
+   - **Key comment:** `takadmin@[YOUR_VPS_HOSTNAME]` (or leave blank)
+   - **Key passphrase:** (optional but recommended)
+5. Click "Save private key" → Save as `takadmin-[YOUR_VPS_HOSTNAME].ppk`
+6. Copy the public key text from the top box (starts with `ssh-rsa`)
+
+> ⚠️ **USER CONFIGURATION REQUIRED**  
+> Replace `[YOUR_VPS_HOSTNAME]` with a short name for your VPS (e.g., `takvps`, `prodtak`).
 
 **Step 2: Add Public Key to VPS**
+
+🖥️ **VPS Host** (connect with password this time)
+
 ```bash
-# Still connected to VPS as root or your current user
 # Switch to takadmin
 su - takadmin
 
@@ -137,8 +155,7 @@ chmod 700 ~/.ssh
 # Create authorized_keys file
 nano ~/.ssh/authorized_keys
 
-# Paste the public key you copied from PuTTYgen
-# (Right-click in PuTTY to paste)
+# Paste the public key from PuTTYgen (right-click to paste in PuTTY)
 # Should be one long line starting with "ssh-rsa AAAA..."
 
 # Save and exit (Ctrl+X, Y, Enter)
@@ -150,75 +167,80 @@ chmod 600 ~/.ssh/authorized_keys
 exit
 ```
 
-**Step 3: Configure PuTTY to Use Your Private Key**
+**Step 3: Configure PuTTY Session**
+
+💻 **Local Machine (Windows)**
 
 1. Open **PuTTY**
-2. In the left panel, navigate to: **Connection → SSH → Auth**
-3. Click "Browse" next to "Private key file for authentication"
-4. Select your saved `takadmin-pinetech3.ppk` file
-5. In the left panel, go back to **Session**
-6. Enter connection details:
-   - **Host Name:** `takadmin@your-vps-ip` (e.g., `takadmin@104.225.221.119`)
-   - **Port:** `22`
-   - **Connection type:** SSH
-7. **Save this session:**
-   - In "Saved Sessions" box, type: `TAK-VPS-pinetech3`
-   - Click "Save"
-8. Click "Open" to connect
+2. Navigate to: **Connection → SSH → Auth → Credentials**
+3. Browse and select your `.ppk` file for "Private key file for authentication"
+4. Go back to **Session**
+5. Enter: `takadmin@[YOUR_VPS_IP]` in Host Name, Port `22`, SSH
+6. Save session with a name (e.g., `TAK-VPS`)
+7. Click **Open** to connect
 
 **Step 4: Test Connection**
 
-- Should connect without asking for password (if you didn't set a passphrase)
-- If you set a passphrase, you'll be prompted for it
-- Once connected, you should be logged in as takadmin
+- Should connect without password (or prompt for passphrase if you set one)
+- Accept the host key warning on first connection
 
-**Optional: Use Pageant for Passphrase Management**
+> 💡 **TIP: Use Pageant for Passphrase Management**  
+> Pageant (included with PuTTY) lets you enter your passphrase once per session:
+> 1. Launch **Pageant** (appears in system tray)
+> 2. Right-click → "Add Key" → Select your `.ppk` file
+> 3. Enter passphrase once; PuTTY uses it automatically
 
-If you used a passphrase, you can use **Pageant** (comes with PuTTY) to avoid entering it every time:
-
-1. Launch **Pageant** (system tray icon)
-2. Right-click Pageant icon → "Add Key"
-3. Select your `takadmin-pinetech3.ppk` file
-4. Enter passphrase once
-5. PuTTY will now use the key automatically without prompting
+> ⛔ **SECURITY NOTE**  
+> Keep your `.ppk` file safe! Anyone with this file (and passphrase if set) can access your VPS.
 
 ---
 
-#### For Linux/Mac Users (Traditional SSH)
-```bash
-# From your local machine (not VPS)
-ssh-keygen -t rsa -b 4096 -C "takadmin@pinetech3"
+### 2.2 For Linux/Mac Users
 
-# Save to: ~/.ssh/takadmin-pinetech3
-# Enter passphrase (optional)
+💻 **Local Machine (Linux/Mac)**
+
+```bash
+# Generate SSH key pair
+ssh-keygen -t rsa -b 4096 -C "takadmin@[YOUR_VPS_HOSTNAME]"
+
+# When prompted for file location:
+# Save to: ~/.ssh/takadmin-[YOUR_VPS_HOSTNAME]
+# Enter passphrase (optional but recommended)
 
 # Copy public key to VPS
-ssh-copy-id -i ~/.ssh/takadmin-pinetech3.pub takadmin@your-vps-ip
+ssh-copy-id -i ~/.ssh/takadmin-[YOUR_VPS_HOSTNAME].pub takadmin@[YOUR_VPS_IP]
 
 # Test passwordless login
-ssh -i ~/.ssh/takadmin-pinetech3 takadmin@your-vps-ip
+ssh -i ~/.ssh/takadmin-[YOUR_VPS_HOSTNAME] takadmin@[YOUR_VPS_IP]
 ```
+
+> ⚠️ **USER CONFIGURATION REQUIRED**  
+> Replace `[YOUR_VPS_HOSTNAME]` and `[YOUR_VPS_IP]` with your values.
 
 ---
 
-**Verify SSH Key Authentication Works:**
+### 2.3 Verify SSH Key Authentication Works
+
+💻 **Local Machine**
+
 ```bash
-# Try connecting - should NOT ask for password
+# Should connect without asking for password
 # (or only ask for passphrase if you set one)
 
-# From PuTTY: Load saved session and click "Open"
-# From Linux/Mac: ssh -i ~/.ssh/takadmin-pinetech3 takadmin@your-vps-ip
+# Windows/PuTTY: Load saved session and click "Open"
+# Linux/Mac: ssh -i ~/.ssh/takadmin-[YOUR_VPS_HOSTNAME] takadmin@[YOUR_VPS_IP]
 ```
-
-**Security Note:** Keep your `.ppk` file safe! Anyone with this file (and passphrase if set) can access your VPS as takadmin.
 
 ---
 
-## Step 2: Install LXD
+## Step 3: Install LXD
 
 LXD is installed via snap on Ubuntu.
 
-### 2.1 Verify Snapd is Installed
+🖥️ **VPS Host** (as takadmin)
+
+### 3.1 Verify Snapd is Installed
+
 ```bash
 # Check if snapd is running
 systemctl status snapd
@@ -227,7 +249,8 @@ systemctl status snapd
 sudo apt install snapd -y
 ```
 
-### 2.2 Install LXD Snap
+### 3.2 Install LXD Snap
+
 ```bash
 # Install LXD (latest stable LTS - currently 5.21)
 sudo snap install lxd
@@ -238,7 +261,8 @@ lxd --version
 # Expected output similar to: 5.21
 ```
 
-### 2.3 Add User to LXD Group
+### 3.3 Add User to LXD Group
+
 ```bash
 # Add current user to lxd group
 sudo usermod -aG lxd $USER
@@ -252,18 +276,22 @@ groups | grep lxd
 
 ---
 
-## Step 3: Initialize LXD
+## Step 4: Initialize LXD
 
 This is the **most important step**. LXD needs to be configured for networking and storage.
 
-### 3.1 Run LXD Init
+🖥️ **VPS Host**
+
+### 4.1 Run LXD Init
+
 ```bash
 lxd init
 ```
 
-### 3.2 Answer the Initialization Prompts
+### 4.2 Answer the Initialization Prompts
 
 **Follow this configuration for TAK Server deployment:**
+
 ```
 Would you like to use LXD clustering? (yes/no) [default=no]: 
 → no
@@ -302,7 +330,11 @@ Would you like a YAML "lxd init" preseed to be printed? (yes/no) [default=no]:
 → no
 ```
 
-### 3.3 Verify LXD Configuration
+> 💡 **TIP: Storage Backend**  
+> We use `dir` instead of `zfs` because ZFS may not be available on all VPS systems. If your VPS supports ZFS and you're comfortable with it, ZFS offers better performance and snapshot capabilities.
+
+### 4.3 Verify LXD Configuration
+
 ```bash
 # Check LXD network
 lxc network list
@@ -322,11 +354,14 @@ lxc storage list
 
 ---
 
-## Step 4: Test LXD Installation
+## Step 5: Test LXD Installation
 
 **Always test before proceeding!**
 
-### 4.1 Launch a Test Container
+🖥️ **VPS Host**
+
+### 5.1 Launch a Test Container
+
 ```bash
 # Launch Ubuntu 22.04 test container
 lxc launch ubuntu:22.04 test
@@ -342,7 +377,11 @@ lxc list
 # +------+---------+---------------------+------+------------+-----------+
 ```
 
-### 4.2 Verify Container Networking
+> 💡 **TIP**  
+> Note the container IP address (e.g., `10.x.x.x`). Your actual containers will get IPs from this same range.
+
+### 5.2 Verify Container Networking
+
 ```bash
 # Test internet connectivity from container
 lxc exec test -- ping -c 3 1.1.1.1
@@ -353,7 +392,8 @@ lxc exec test -- ping -c 3 google.com
 # If both work, networking is good! ✅
 ```
 
-### 4.3 Test Container Access
+### 5.3 Test Container Access
+
 ```bash
 # Get a shell in the container
 lxc exec test -- bash
@@ -365,7 +405,8 @@ apt update
 exit
 ```
 
-### 4.4 Clean Up Test Container
+### 5.4 Clean Up Test Container
+
 ```bash
 # Stop and delete test container
 lxc stop test
@@ -377,11 +418,14 @@ lxc list
 
 ---
 
-## Step 5: Configure Firewall (UFW)
+## Step 6: Configure Firewall (UFW)
 
 **Important:** Configure firewall BEFORE creating TAK containers.
 
-### 5.1 Install and Enable UFW
+🖥️ **VPS Host**
+
+### 6.1 Install and Enable UFW
+
 ```bash
 # Install UFW (usually pre-installed)
 sudo apt install ufw -y
@@ -403,7 +447,11 @@ sudo ufw enable
 sudo ufw status verbose
 ```
 
-### 5.2 Allow TAK Server Ports
+> ⛔ **CRITICAL**  
+> Always allow SSH before enabling UFW, or you'll lock yourself out!
+
+### 6.2 Allow TAK Server Ports
+
 ```bash
 # TAK client connections (ATAK/WinTAK/iTAK)
 sudo ufw allow 8089/tcp comment 'TAK Client'
@@ -426,11 +474,14 @@ sudo ufw status numbered
 
 ---
 
-## Step 6: Configure LXD Network for Firewall
+## Step 7: Configure LXD Network for Firewall
 
 LXD containers need to reach the internet through the host's firewall.
 
-### 6.1 Enable IP Forwarding
+🖥️ **VPS Host**
+
+### 7.1 Enable IP Forwarding
+
 ```bash
 # Check if IP forwarding is enabled
 cat /proc/sys/net/ipv4/ip_forward
@@ -443,13 +494,15 @@ sudo sysctl -w net.ipv4.ip_forward=1
 echo "net.ipv4.ip_forward=1" | sudo tee -a /etc/sysctl.conf
 ```
 
-### 6.2 Configure UFW for LXD
+### 7.2 Configure UFW for LXD
+
 ```bash
 # Edit UFW before.rules
 sudo nano /etc/ufw/before.rules
 ```
 
-**Add these lines AFTER the header comments but BEFORE the *filter section:**
+**Add these lines AFTER the header comments but BEFORE the `*filter` section:**
+
 ```
 # NAT table rules for LXD
 *nat
@@ -461,9 +514,13 @@ sudo nano /etc/ufw/before.rules
 COMMIT
 ```
 
+> 💡 **TIP**  
+> If your VPS uses a different network interface (not `eth0`), check with `ip a` and adjust accordingly.
+
 **Save and exit** (Ctrl+X, Y, Enter)
 
-### 6.3 Allow LXD Bridge Traffic
+### 7.3 Allow LXD Bridge Traffic
+
 ```bash
 # Allow traffic on lxdbr0
 sudo ufw allow in on lxdbr0
@@ -474,7 +531,8 @@ sudo ufw route allow out on lxdbr0
 sudo ufw reload
 ```
 
-### 6.4 Verify Container Internet Access
+### 7.4 Verify Container Internet Access
+
 ```bash
 # Launch another test container
 lxc launch ubuntu:22.04 nettest
@@ -494,11 +552,23 @@ lxc delete nettest
 
 ---
 
-## Step 7: Optional - Configure LXD Limits
+## Step 8: Optional - Configure LXD Resource Limits
 
-Set resource limits to prevent containers from consuming all VPS resources.
+> 💡 **SKIP THIS STEP FOR MOST USERS**  
+> LXD containers share host resources by default, which works fine for most TAK Server deployments. Only configure limits if you:
+> - Are running multiple containers and need to prevent one from starving others
+> - Have specific resource requirements you've calculated
+> - Are experienced with Linux resource management
+>
+> **Default recommendation:** Skip this section and proceed to Step 9.
 
-### 7.1 Create a Limited Profile (Optional)
+<details>
+<summary><strong>Advanced: Click to expand resource limit configuration</strong></summary>
+
+🖥️ **VPS Host**
+
+### 8.1 Create a Limited Profile
+
 ```bash
 # Create a profile for TAK containers
 lxc profile create tak-limited
@@ -515,9 +585,11 @@ lxc profile show tak-limited
 
 **You'll apply this profile when creating the TAK container in the next guide.**
 
+</details>
+
 ---
 
-## Step 8: Verification Checklist
+## Step 9: Verification Checklist
 
 Before moving to Phase 2 (Container Creation), verify:
 
@@ -530,6 +602,15 @@ Before moving to Phase 2 (Container Creation), verify:
 - [ ] LXD bridge traffic is allowed through UFW
 
 ### Quick Verification Script
+
+🖥️ **VPS Host**
+
+Create the script:
+```bash
+nano verify-lxd.sh
+```
+
+Paste the following:
 ```bash
 #!/bin/bash
 echo "=== LXD Setup Verification ==="
@@ -556,9 +637,10 @@ echo ""
 echo "If all checks show ✅, proceed to Phase 2: Container Setup"
 ```
 
-**Save this as `verify-lxd.sh` and run:**
+Save and exit (Ctrl+X, Y, Enter), then run:
+
 ```bash
-sudo chmod +x verify-lxd.sh
+chmod +x verify-lxd.sh
 ./verify-lxd.sh
 ```
 
@@ -569,6 +651,7 @@ sudo chmod +x verify-lxd.sh
 ### Issue: "Permission denied" when running lxc commands
 
 **Solution:**
+
 ```bash
 # Add user to lxd group
 sudo usermod -aG lxd $USER
@@ -585,27 +668,27 @@ groups | grep lxd
 **Check these in order:**
 
 1. **IP forwarding:**
-```bash
+   ```bash
    cat /proc/sys/net/ipv4/ip_forward
    # Must be: 1
-```
+   ```
 
 2. **UFW routing:**
-```bash
+   ```bash
    sudo ufw status verbose
    # Should show lxdbr0 allowed
-```
+   ```
 
 3. **NAT rules:**
-```bash
+   ```bash
    sudo cat /etc/ufw/before.rules | grep -A 5 "nat"
    # Should show POSTROUTING rule
-```
+   ```
 
 4. **Test from host:**
-```bash
+   ```bash
    ping -c 3 1.1.1.1  # Should work from host
-```
+   ```
 
 ### Issue: LXD init fails with storage error
 
@@ -616,6 +699,7 @@ ZFS may not be available on all VPS systems. If init fails, run again and choose
 ### Issue: IPv6 conflicts
 
 **Solution - Disable IPv6 in LXD:**
+
 ```bash
 lxc network set lxdbr0 ipv6.address none
 lxc network show lxdbr0
@@ -630,6 +714,7 @@ Once all verification checks pass:
 **➡️ Proceed to:** [Phase 2: Container Setup](02-CONTAINER-SETUP.md)
 
 This next guide covers:
+
 - Creating the TAK Server container
 - Initial container configuration
 - Preparing for TAK Server installation
