@@ -1,0 +1,89 @@
+# ============================================================
+# LXD Profile for TAK Server Deployment
+# ============================================================
+#
+# This profile configures containers for the installTAK-LXD deployment
+# using Option B networking: dedicated takbr0 bridge (10.100.100.0/24)
+#
+# USAGE:
+#   1. Create the takbr0 network first (see Phase 1 documentation)
+#   2. Create this profile: lxc profile create tak-profile
+#   3. Edit the profile: lxc profile edit tak-profile < lxd-profile.yaml
+#   4. Apply to containers: lxc profile add tak tak-profile
+#
+# NOTE: This profile provides defaults. Container-specific settings
+#       (like static IPs) are applied when launching containers.
+#
+# ============================================================
+
+config:
+  # Security settings for containers
+  security.nesting: "false"
+  security.privileged: "false"
+  
+  # Boot settings
+  boot.autostart: "true"
+  boot.autostart.delay: "10"
+  boot.autostart.priority: "5"
+
+description: TAK Server deployment profile for installTAK-LXD
+
+devices:
+  # Root filesystem with reasonable limits
+  root:
+    path: /
+    pool: default
+    size: 50GB
+    type: disk
+
+  # Network connection to takbr0
+  eth0:
+    name: eth0
+    network: takbr0
+    type: nic
+
+name: tak-profile
+
+# ============================================================
+# CONTAINER-SPECIFIC CONFIGURATIONS
+# ============================================================
+#
+# When launching containers, apply static IPs like this:
+#
+# TAK Server Container:
+#   lxc launch ubuntu:22.04 tak --profile tak-profile
+#   lxc config device set tak eth0 ipv4.address=10.100.100.10
+#
+# HAProxy Container:
+#   lxc launch ubuntu:22.04 haproxy --profile tak-profile
+#   lxc config device set haproxy eth0 ipv4.address=10.100.100.11
+#
+# MediaMTX Container (optional):
+#   lxc launch ubuntu:22.04 mediamtx --profile tak-profile
+#   lxc config device set mediamtx eth0 ipv4.address=10.100.100.12
+#
+# NextCloud Container (optional):
+#   lxc launch ubuntu:22.04 nextcloud --profile tak-profile
+#   lxc config device set nextcloud eth0 ipv4.address=10.100.100.13
+#
+# ============================================================
+
+
+# ============================================================
+# NETWORK CREATION COMMANDS (for reference)
+# ============================================================
+#
+# Create the dedicated TAK bridge network:
+#
+#   lxc network create takbr0 \
+#     ipv4.address=10.100.100.1/24 \
+#     ipv4.nat=true \
+#     ipv4.dhcp=true \
+#     ipv4.dhcp.ranges=10.100.100.100-10.100.100.199 \
+#     ipv6.address=none
+#
+# Verify the network:
+#   lxc network show takbr0
+#   lxc network list
+#
+# ============================================================
