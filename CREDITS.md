@@ -2,7 +2,7 @@
 
 ## Original Work
 
-This project builds upon the foundation created by:
+This project builds upon the great works of:
 
 ### installTAK
 - **Repository**: https://github.com/myTeckNet/installTAK
