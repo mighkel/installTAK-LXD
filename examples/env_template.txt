@@ -2,20 +2,20 @@
 # ============================================================
 # TAK SERVER LXD DEPLOYMENT - USER CONFIGURATION
 # ============================================================
-# 
+#
 # PURPOSE:
 # This file contains ALL user-specific configuration values
 # needed for a complete TAK Server deployment. Fill this out
 # COMPLETELY before starting the installation process.
 #
 # HOW TO USE:
-# 1. Copy this file to a secure location
+# 1. Copy this file: cp env.template my-deployment.env
 # 2. Fill in ALL required values below
-# 3. Save the file
-# 4. Use values for copy-paste during manual installation
+# 3. Save the file securely (contains passwords!)
+# 4. Reference values during manual installation
 # 5. Future: Can be sourced by automation scripts
 #
-# PLACEHOLDER SYNTAX REMINDER:
+# PLACEHOLDER SYNTAX:
 # When copying values to commands, replace brackets AND text.
 # Example: If YOUR_VPS_IP="203.0.113.50"
 #   Command shows: ssh takadmin@[YOUR_VPS_IP]
@@ -29,65 +29,59 @@
 # Used in: Phase 1 (LXD Setup), Phase 5 (Networking)
 # ============================================================
 
-# Your VPS public IP address
-# Find this in your VPS provider's dashboard
-# Example: 203.0.113.50
-YOUR_VPS_IP="[FILL_THIS_IN]"
+# Your VPS public IP address (from provider dashboard)
+YOUR_VPS_IP=""
 
-# Short hostname for your VPS (no spaces, lowercase)
-# Used in command prompts, logs, and identification
-# Example: takvps, takprod, mytak
-YOUR_VPS_HOSTNAME="[FILL_THIS_IN]"
+# Short hostname for your VPS (lowercase, no spaces)
+# Examples: takvps, takprod, mytak
+YOUR_VPS_HOSTNAME=""
 
-# Your TAK server fully qualified domain name (FQDN)
+# Your TAK server fully qualified domain name
 # Must have DNS A record pointing to YOUR_VPS_IP
 # Example: tak.example.com
-YOUR_DOMAIN="[FILL_THIS_IN]"
+YOUR_DOMAIN=""
 
-# Your base domain (for additional services)
+# Your base domain (for DNS references)
 # Example: example.com
-YOUR_BASE_DOMAIN="[FILL_THIS_IN]"
+YOUR_BASE_DOMAIN=""
 
 # Timezone for your server
-# Find yours: https://en.wikipedia.org/wiki/List_of_tz_database_time_zones
+# Find yours: timedatectl list-timezones | grep America
 # Example: America/Denver, America/New_York, Europe/London
-YOUR_TIMEZONE="[FILL_THIS_IN]"
+YOUR_TIMEZONE=""
 
 
 # ============================================================
-# SECTION 2: CONTAINER NETWORK (Static IPs)
-# Used in: Phase 1 (LXD Setup), Phase 2 (Container Setup),
-#          Phase 5 (HAProxy Configuration)
+# SECTION 2: CONTAINER NETWORK (Option B - Static IPs)
+# Used in: Phase 1, Phase 2, Phase 5
 # ============================================================
 #
-# These are INTERNAL IPs on the LXD bridge network.
-# Using static IPs makes HAProxy configuration predictable.
+# This deployment uses a dedicated LXD bridge network (takbr0)
+# with predictable static IPs for all containers.
 #
 # Network: 10.100.100.0/24
 # Gateway: 10.100.100.1 (the bridge itself)
-# Static:  10.100.100.10-99 (for containers)
-# DHCP:    10.100.100.100-199 (if needed for other containers)
+# Static:  10.100.100.10-99 (containers)
+# DHCP:    10.100.100.100-199 (auto-assigned if needed)
 #
-# NOTE: These defaults work for most deployments.
-# Only change if you have IP conflicts.
+# These defaults work for most deployments.
+# Only change if you have specific network requirements.
 # ------------------------------------------------------------
 
-# LXD Bridge name (created in Phase 1)
+# LXD Bridge name
 LXD_BRIDGE_NAME="takbr0"
 
-# Bridge gateway IP (the host side of the bridge)
-LXD_BRIDGE_IP="10.100.100.1/24"
+# Bridge gateway IP (host side of bridge)
+LXD_BRIDGE_SUBNET="10.100.100.0/24"
+LXD_BRIDGE_IP="10.100.100.1"
 
-# TAK Server container IP
+# Container static IPs
 TAK_CONTAINER_IP="10.100.100.10"
-
-# HAProxy container IP
 HAPROXY_CONTAINER_IP="10.100.100.11"
 
 # Optional service container IPs (uncomment if using)
-# MEDIAMTX_CONTAINER_IP="10.100.100.12"    # Video streaming (RTSP)
-# NEXTCLOUD_CONTAINER_IP="10.100.100.13"   # File sharing
-# WEB_CONTAINER_IP="10.100.100.14"         # General web server
+# MEDIAMTX_CONTAINER_IP="10.100.100.12"
+# NEXTCLOUD_CONTAINER_IP="10.100.100.13"
 
 
 # ============================================================
@@ -96,30 +90,29 @@ HAPROXY_CONTAINER_IP="10.100.100.11"
 # ============================================================
 #
 # These values appear in your SSL certificates.
-# Use your actual organization info for production deployments.
+# Use your actual organization info for production.
 # ------------------------------------------------------------
 
 # Your organization's full name
-# Example: Mountain View Fire Department
-# Example: Example County Search and Rescue
-YOUR_ORG="[FILL_THIS_IN]"
+# Example: Mountain Search and Rescue
+YOUR_ORG=""
 
-# Certificate Authority name prefix (short, no spaces, uppercase recommended)
-# This becomes part of your root CA name: [YOUR_CA_NAME]-ROOT-CA
-# Example: MVFD, YOURORG, ECSAR
-YOUR_CA_NAME="[FILL_THIS_IN]"
+# Certificate Authority name prefix (short, no spaces)
+# Becomes part of root CA name: [YOUR_CA_NAME]-ROOT-CA
+# Example: MSAR, YOURORG
+YOUR_CA_NAME=""
 
-# State or Province (full name, not abbreviation)
-# Example: Colorado, California, Texas
-YOUR_STATE="[FILL_THIS_IN]"
+# State or Province (full name)
+# Example: Colorado, California
+YOUR_STATE=""
 
 # City
-# Example: Denver, Los Angeles, Austin
-YOUR_CITY="[FILL_THIS_IN]"
+# Example: Denver, Los Angeles
+YOUR_CITY=""
 
-# Organizational Unit (optional - can leave blank or use "NA")
-# Example: Communications, IT Department, Operations
-YOUR_UNIT="[FILL_THIS_IN]"
+# Organizational Unit (optional, use "NA" if none)
+# Example: Communications, IT, Operations
+YOUR_UNIT=""
 
 
 # ============================================================
@@ -127,72 +120,49 @@ YOUR_UNIT="[FILL_THIS_IN]"
 # Used in: Phase 3, Phase 4, Phase 5
 # ============================================================
 #
-# ⚠️  IMPORTANT: You MUST set all passwords - no defaults!
-# ⚠️  Store this file securely - it contains sensitive info!
+# ⚠️  IMPORTANT: Set strong passwords - no defaults!
+# ⚠️  Store this file securely - it contains secrets!
 # ------------------------------------------------------------
 
-# Certificate password (used for ALL .p12 and .jks files)
-# This password protects your certificates - make it strong!
-# Minimum 8 characters recommended
-# Example: MyT@kS3rv3r2024!
-#
-# ⛔ DO NOT use the old default 'atakatak' - it is widely known!
-CERT_PASSWORD="[FILL_THIS_IN]"
+# Certificate password (for ALL .p12 and .jks files)
+# Minimum 8 characters, use special characters
+# ⛔ DO NOT use default 'atakatak' - widely known!
+CERT_PASSWORD=""
 
-# HAProxy statistics page credentials
-# Access at: http://localhost:8404/haproxy_stats (via SSH tunnel)
+# HAProxy statistics page password
+# Access via SSH tunnel: http://localhost:8404/haproxy_stats
 HAPROXY_STATS_USER="admin"
-HAPROXY_STATS_PASSWORD="[FILL_THIS_IN]"
+HAPROXY_STATS_PASSWORD=""
 
-# Email address for Let's Encrypt notifications
-# You'll receive certificate expiry warnings (90-day certs)
-# Example: admin@example.com, takadmin@yourdomain.com
-YOUR_EMAIL="[FILL_THIS_IN]"
+# Email for Let's Encrypt notifications
+# Receives certificate expiry warnings (90-day certs)
+YOUR_EMAIL=""
 
 
 # ============================================================
 # SECTION 5: TAK SERVER FILES
-# Used in: Phase 2 (Container Setup), Phase 3 (TAK Installation)
+# Used in: Phase 2, Phase 3
 # ============================================================
 #
-# ⛔⛔⛔ CRITICAL: READ THIS CAREFULLY ⛔⛔⛔
+# ⛔ READ CAREFULLY - Common source of errors!
 #
-# The TAK Server filename has an unusual naming convention that
-# has tripped up many users. You MUST enter the EXACT filename.
+# The TAK Server filename uses BOTH hyphens AND underscores:
+#   takserver-5.5-RELEASE##_all.deb
+#             ^         ^
+#          hyphen    underscore
 #
-# WATCH FOR:
-#   - HYPHEN (-) vs UNDERSCORE (_) - they look similar!
-#   - The pattern uses BOTH: takserver-5.5-RELEASE##_all.deb
-#                                      ^         ^
-#                                   hyphen    underscore
+# CORRECT: takserver-5.5-RELEASE58_all.deb
+# WRONG:   takserver_5.5_RELEASE58_all.deb (all underscores)
+# WRONG:   takserver-5.5-RELEASE58-all.deb (all hyphens)
 #
-# CORRECT examples:
-#   takserver-5.5-RELEASE58_all.deb   ✅
-#   takserver-5.5-RELEASE62_all.deb   ✅
-#
-# WRONG examples:
-#   takserver_5.5_RELEASE58_all.deb   ❌ (all underscores)
-#   takserver-5.5-RELEASE58-all.deb   ❌ (all hyphens)
-#   takserver-5.5-RELEASE58.deb       ❌ (missing _all)
-#
-# HOW TO VERIFY:
-# 1. Go to your Downloads folder
-# 2. Look at the ACTUAL filename (not what you think it is)
-# 3. Copy it exactly, or type it character-by-character
-#
-# Download TAK Server from: https://tak.gov/products/tak-server
+# Download from: https://tak.gov/products/tak-server
 # ------------------------------------------------------------
 
-# TAK Server .deb filename - EXACT filename as downloaded
-# Copy this EXACTLY from your downloaded file
-# Pattern: takserver-5.5-RELEASE##_all.deb (note: hyphen, hyphen, underscore)
-TAK_DEB_FILENAME="[FILL_THIS_IN]"
+# TAK Server .deb filename (EXACT as downloaded)
+TAK_DEB_FILENAME=""
 
-# TAK container hostname (usually just "tak")
-# This becomes the container name and internal hostname
+# Container names
 TAK_CONTAINER_NAME="tak"
-
-# HAProxy container hostname
 HAPROXY_CONTAINER_NAME="haproxy"
 
 
@@ -200,21 +170,15 @@ HAPROXY_CONTAINER_NAME="haproxy"
 # SECTION 6: OPTIONAL SERVICES
 # Used in: Phase 5 (Networking)
 # ============================================================
-#
-# Set to "yes" to enable, "no" to skip
-# These affect HAProxy configuration and DNS requirements
-# ------------------------------------------------------------
 
 # Let's Encrypt SSL certificates (recommended)
-# Provides browser-trusted certs for enrollment page
 ENABLE_LETSENCRYPT="yes"
 
-# MediaMTX - RTSP video streaming server
+# MediaMTX - RTSP video streaming
 # For drone feeds, surveillance cameras, etc.
 ENABLE_MEDIAMTX="no"
 
-# NextCloud - File sharing and collaboration
-# Alternative to commercial cloud storage
+# NextCloud - File sharing
 ENABLE_NEXTCLOUD="no"
 
 
@@ -223,21 +187,16 @@ ENABLE_NEXTCLOUD="no"
 # ============================================================
 #
 # Create these DNS A records BEFORE starting Phase 5.
-# All records point to the same IP: YOUR_VPS_IP
+# All records point to: YOUR_VPS_IP
 #
-# ┌─────────────────────────┬─────────────────┬──────────┐
-# │ Hostname                │ Type │ Value    │ Required │
-# ├─────────────────────────┼──────┼──────────┼──────────┤
-# │ tak.YOUR_BASE_DOMAIN    │ A    │ VPS IP   │ YES      │
-# │ files.YOUR_BASE_DOMAIN  │ A    │ VPS IP   │ If NC    │
-# │ rtsp.YOUR_BASE_DOMAIN   │ A    │ VPS IP   │ If MTX   │
-# └─────────────────────────┴──────┴──────────┴──────────┘
+# Required:
+#   tak.[YOUR_BASE_DOMAIN] → [YOUR_VPS_IP]
 #
-# Example for example.com with VPS IP 203.0.113.50:
-#   tak.example.com   → 203.0.113.50
-#   files.example.com → 203.0.113.50 (if using NextCloud)
+# Optional (if using):
+#   files.[YOUR_BASE_DOMAIN] → [YOUR_VPS_IP]  (NextCloud)
+#   rtsp.[YOUR_BASE_DOMAIN] → [YOUR_VPS_IP]   (MediaMTX)
 #
-# Verify with: dig tak.YOUR_BASE_DOMAIN +short
+# Verify: dig tak.[YOUR_BASE_DOMAIN] +short
 # ============================================================
 
 
@@ -245,93 +204,60 @@ ENABLE_NEXTCLOUD="no"
 # SECTION 8: PORT REFERENCE
 # ============================================================
 #
-# These ports must be open in your VPS firewall (UFW).
-# Phase 1 covers firewall setup.
+# Required ports (open in VPS firewall):
+#   22   - SSH
+#   80   - HTTP (ACME/Let's Encrypt)
+#   8089 - TAK client connections
+#   8443 - TAK Web UI
+#   8446 - TAK certificate enrollment
 #
-# ┌───────┬─────────────────────────────────┬──────────┐
-# │ Port  │ Service                         │ Required │
-# ├───────┼─────────────────────────────────┼──────────┤
-# │ 22    │ SSH                             │ YES      │
-# │ 80    │ HTTP (ACME/Let's Encrypt)       │ YES      │
-# │ 443   │ HTTPS (web services)            │ Optional │
-# │ 8089  │ TAK Client connections          │ YES      │
-# │ 8443  │ TAK Web UI                      │ YES      │
-# │ 8446  │ TAK Certificate Enrollment      │ YES      │
-# │ 8554  │ RTSP (MediaMTX)                 │ If MTX   │
-# │ 8404  │ HAProxy Stats (SSH tunnel only) │ Optional │
-# └───────┴─────────────────────────────────┴──────────┘
+# Optional:
+#   443  - HTTPS (web services)
+#   8554 - RTSP (MediaMTX)
+#   8404 - HAProxy stats (SSH tunnel only)
 # ============================================================
 
 
 # ============================================================
-# SECTION 9: QUICK REFERENCE - VALUES BY PHASE
-# ============================================================
-#
-# PHASE 1 - LXD Setup:
-#   - YOUR_VPS_IP
-#   - YOUR_VPS_HOSTNAME
-#   - LXD_BRIDGE_NAME
-#   - LXD_BRIDGE_IP
-#
-# PHASE 2 - Container Setup:
-#   - TAK_CONTAINER_NAME
-#   - TAK_CONTAINER_IP
-#   - YOUR_TIMEZONE
-#   - TAK_DEB_FILENAME
-#
-# PHASE 3 - TAK Installation:
-#   - YOUR_DOMAIN
-#   - YOUR_ORG
-#   - YOUR_CA_NAME
-#   - YOUR_STATE
-#   - YOUR_CITY
-#   - YOUR_UNIT
-#   - CERT_PASSWORD
-#   - TAK_DEB_FILENAME
-#
-# PHASE 4 - Certificate Management:
-#   - YOUR_CA_NAME
-#   - CERT_PASSWORD
-#
-# PHASE 5 - Networking:
-#   - YOUR_DOMAIN
-#   - YOUR_BASE_DOMAIN
-#   - YOUR_VPS_IP
-#   - TAK_CONTAINER_IP
-#   - HAPROXY_CONTAINER_IP
-#   - HAPROXY_STATS_USER
-#   - HAPROXY_STATS_PASSWORD
-#   - YOUR_EMAIL (for Let's Encrypt)
-#   - CERT_PASSWORD (for JKS conversion)
-#
-# PHASE 6 - Verification:
-#   - YOUR_DOMAIN
-#   - CERT_PASSWORD
-#
+# SECTION 9: COMPUTED VALUES (DO NOT EDIT)
 # ============================================================
 
-
-# ============================================================
-# SECTION 10: COMPUTED VALUES (DO NOT EDIT)
-# ============================================================
-#
-# These are derived from your inputs above.
-# Used by automation scripts.
-# ------------------------------------------------------------
-
-# Full CA name (generated from YOUR_CA_NAME)
-# Example: MVFD-ROOT-CA
 FULL_CA_NAME="${YOUR_CA_NAME}-ROOT-CA"
-
-# Let's Encrypt keystore filename
-# Example: tak-le.jks
 LE_KEYSTORE_FILENAME="${TAK_CONTAINER_NAME}-le.jks"
-
-# TAK Server GPG key filename (standard - doesn't change)
 TAK_GPG_KEY_FILENAME="takserver-public-gpg.key"
-
-# TAK Server policy filename (standard - doesn't change)
 TAK_POLICY_FILENAME="deb_policy.pol"
+
+
+# ============================================================
+# QUICK REFERENCE - VALUES BY PHASE
+# ============================================================
+#
+# PHASE 1: LXD Setup
+#   YOUR_VPS_IP, YOUR_VPS_HOSTNAME
+#   LXD_BRIDGE_NAME, LXD_BRIDGE_SUBNET, LXD_BRIDGE_IP
+#
+# PHASE 2: Container Setup
+#   TAK_CONTAINER_NAME, TAK_CONTAINER_IP
+#   YOUR_TIMEZONE, TAK_DEB_FILENAME
+#
+# PHASE 3: TAK Installation
+#   YOUR_DOMAIN, YOUR_ORG, YOUR_CA_NAME
+#   YOUR_STATE, YOUR_CITY, YOUR_UNIT
+#   CERT_PASSWORD, TAK_DEB_FILENAME
+#
+# PHASE 4: Certificate Management
+#   YOUR_CA_NAME, CERT_PASSWORD
+#
+# PHASE 5: Networking
+#   YOUR_DOMAIN, YOUR_VPS_IP, YOUR_EMAIL
+#   TAK_CONTAINER_IP, HAPROXY_CONTAINER_IP
+#   HAPROXY_STATS_USER, HAPROXY_STATS_PASSWORD
+#   CERT_PASSWORD (for JKS conversion)
+#
+# PHASE 6: Verification
+#   YOUR_DOMAIN, CERT_PASSWORD
+#
+# ============================================================
 
 
 # ============================================================
@@ -340,12 +266,12 @@ TAK_POLICY_FILENAME="deb_policy.pol"
 #
 # NEXT STEPS:
 # 1. Verify all required fields are filled in
-# 2. Save this file securely (contains passwords!)
+# 2. Save this file securely
 # 3. Create DNS records (Section 7)
 # 4. Begin with Phase 1: LXD Setup
 #
-# Questions? Issues?
-# - TAK Syndicate: https://www.thetaksyndicate.org/
-# - GitHub Issues: https://github.com/mighkel/installTAK-LXD/issues
+# Resources:
+#   GitHub: https://github.com/mighkel/installTAK-LXD
+#   TAK Syndicate: https://www.thetaksyndicate.org/
 #
 # ============================================================
