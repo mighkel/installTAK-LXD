@@ -1,179 +1,351 @@
-# installTAK-LXD Environment Configuration Template
-# Copy this file to .env and fill in your actual values
-# .env is in .gitignore and will NOT be committed to git
+#!/bin/bash
+# ============================================================
+# TAK SERVER LXD DEPLOYMENT - USER CONFIGURATION
+# ============================================================
+# 
+# PURPOSE:
+# This file contains ALL user-specific configuration values
+# needed for a complete TAK Server deployment. Fill this out
+# COMPLETELY before starting the installation process.
+#
+# HOW TO USE:
+# 1. Copy this file to a secure location
+# 2. Fill in ALL required values below
+# 3. Save the file
+# 4. Use values for copy-paste during manual installation
+# 5. Future: Can be sourced by automation scripts
+#
+# PLACEHOLDER SYNTAX REMINDER:
+# When copying values to commands, replace brackets AND text.
+# Example: If YOUR_VPS_IP="203.0.113.50"
+#   Command shows: ssh takadmin@[YOUR_VPS_IP]
+#   You type:      ssh takadmin@203.0.113.50
+#
+# ============================================================
 
-#######################################
-# VPS CONFIGURATION
-#######################################
 
-# VPS connection details
-VPS_HOST=104.225.221.119
-VPS_USER=takadmin
-VPS_SSH_PORT=22
+# ============================================================
+# SECTION 1: VPS & NETWORK CONFIGURATION
+# Used in: Phase 1 (LXD Setup), Phase 5 (Networking)
+# ============================================================
 
-# Domain configuration
-DOMAIN_NAME=tak.pinenut.tech
-WEB_DOMAIN=web.pinenut.tech
-FILES_DOMAIN=files.pinenut.tech
+# Your VPS public IP address
+# Find this in your VPS provider's dashboard
+# Example: 203.0.113.50
+YOUR_VPS_IP="[FILL_THIS_IN]"
 
-# DNS Provider (for Let's Encrypt automation)
-DNS_PROVIDER=cloudflare  # or: digitalocean, route53, etc.
-DNS_EMAIL=your-email@example.com
+# Short hostname for your VPS (no spaces, lowercase)
+# Used in command prompts, logs, and identification
+# Example: takvps, takprod, mytak
+YOUR_VPS_HOSTNAME="[FILL_THIS_IN]"
 
-#######################################
-# LXD CONTAINER CONFIGURATION
-#######################################
+# Your TAK server fully qualified domain name (FQDN)
+# Must have DNS A record pointing to YOUR_VPS_IP
+# Example: tak.example.com
+YOUR_DOMAIN="[FILL_THIS_IN]"
 
-# Container naming
-TAK_CONTAINER_NAME=tak
-HAPROXY_CONTAINER_NAME=haproxy
-NEXTCLOUD_CONTAINER_NAME=nextcloud
+# Your base domain (for additional services)
+# Example: example.com
+YOUR_BASE_DOMAIN="[FILL_THIS_IN]"
 
-# Container network (typically auto-configured by LXD)
-LXD_BRIDGE=lxdbr0
-LXD_NETWORK=10.206.248.0/24
+# Timezone for your server
+# Find yours: https://en.wikipedia.org/wiki/List_of_tz_database_time_zones
+# Example: America/Denver, America/New_York, Europe/London
+YOUR_TIMEZONE="[FILL_THIS_IN]"
 
-#######################################
-# TAK SERVER FILE SOURCES
-#######################################
 
-# Choose your file distribution method: gdown or nextcloud
-FILE_FETCH_METHOD=gdown  # Options: gdown, nextcloud
+# ============================================================
+# SECTION 2: CONTAINER NETWORK (Static IPs)
+# Used in: Phase 1 (LXD Setup), Phase 2 (Container Setup),
+#          Phase 5 (HAProxy Configuration)
+# ============================================================
+#
+# These are INTERNAL IPs on the LXD bridge network.
+# Using static IPs makes HAProxy configuration predictable.
+#
+# Network: 10.100.100.0/24
+# Gateway: 10.100.100.1 (the bridge itself)
+# Static:  10.100.100.10-99 (for containers)
+# DHCP:    10.100.100.100-199 (if needed for other containers)
+#
+# NOTE: These defaults work for most deployments.
+# Only change if you have IP conflicts.
+# ------------------------------------------------------------
 
-# GOOGLE DRIVE FILE IDs (if using gdown)
-# Get these from shareable link: https://drive.google.com/file/d/ABC123xyz/view
-# The ID is the part after /d/ and before /view
-GDRIVE_TAKSERVER_ID=your-takserver-file-id-here
-GDRIVE_GPG_KEY_ID=your-gpg-key-file-id-here
-GDRIVE_DEB_POLICY_ID=your-deb-policy-file-id-here  # For Ubuntu deployments
+# LXD Bridge name (created in Phase 1)
+LXD_BRIDGE_NAME="takbr0"
 
-# NEXTCLOUD WebDAV (if using nextcloud)
-NC_URL=https://files.pinenut.tech
-NC_USER=takadmin
-NC_PASSWORD=your-nextcloud-app-password-here
-NC_TAK_PATH=/TAK  # Path in NextCloud where TAK files are stored
+# Bridge gateway IP (the host side of the bridge)
+LXD_BRIDGE_IP="10.100.100.1/24"
 
-#######################################
-# CERTIFICATE CONFIGURATION
-#######################################
+# TAK Server container IP
+TAK_CONTAINER_IP="10.100.100.10"
 
-# Certificate metadata
-CERT_COUNTRY=US
-CERT_STATE=Idaho
-CERT_CITY=Idaho City
-CERT_ORGANIZATION=Clear Creek VFD
-CERT_ORGANIZATIONAL_UNIT=Communications
-CERT_EMAIL=comms@clearcreekvfd.org
+# HAProxy container IP
+HAPROXY_CONTAINER_IP="10.100.100.11"
 
-# Certificate Authority names
-CA_NAME=CCVFD-ROOT-CA
-INTERMEDIATE_CA_NAME=CCVFD-INTERMEDIATE-CA
+# Optional service container IPs (uncomment if using)
+# MEDIAMTX_CONTAINER_IP="10.100.100.12"    # Video streaming (RTSP)
+# NEXTCLOUD_CONTAINER_IP="10.100.100.13"   # File sharing
+# WEB_CONTAINER_IP="10.100.100.14"         # General web server
 
-# Certificate validity (in days)
-CERT_VALIDITY_DAYS=730  # 2 years
 
-# Certificate password (used for .p12 files)
-# Default is 'atakatak' but you should change this
-CERT_PASSWORD=atakatak
+# ============================================================
+# SECTION 3: ORGANIZATION INFORMATION
+# Used in: Phase 3 (TAK Installation - Certificate Generation)
+# ============================================================
+#
+# These values appear in your SSL certificates.
+# Use your actual organization info for production deployments.
+# ------------------------------------------------------------
 
-#######################################
-# TAK SERVER CONFIGURATION
-#######################################
+# Your organization's full name
+# Example: Mountain View Fire Department
+# Example: Example County Search and Rescue
+YOUR_ORG="[FILL_THIS_IN]"
 
-# TAK Server version
-TAK_VERSION=5.5-RELEASE
+# Certificate Authority name prefix (short, no spaces, uppercase recommended)
+# This becomes part of your root CA name: [YOUR_CA_NAME]-ROOT-CA
+# Example: MVFD, YOURORG, ECSAR
+YOUR_CA_NAME="[FILL_THIS_IN]"
 
-# TAK Server ports
-TAK_CLIENT_PORT=8089      # ATAK/WinTAK/iTAK connections
-TAK_WEB_PORT=8443         # Web UI
-TAK_ENROLLMENT_PORT=8446  # Certificate enrollment
-TAK_FEDERATION_PORT=9001  # Federation with other TAK Servers
+# State or Province (full name, not abbreviation)
+# Example: Colorado, California, Texas
+YOUR_STATE="[FILL_THIS_IN]"
 
-# TAK Server features
-ENABLE_ENROLLMENT=true
-ENABLE_FEDERATION=false
-ENABLE_QUIC=false  # QUIC protocol support (experimental)
+# City
+# Example: Denver, Los Angeles, Austin
+YOUR_CITY="[FILL_THIS_IN]"
 
-# PostgreSQL database
-POSTGRES_PASSWORD=changeme-secure-password-here
-POSTGRES_DB=cot
-POSTGRES_USER=martiuser
+# Organizational Unit (optional - can leave blank or use "NA")
+# Example: Communications, IT Department, Operations
+YOUR_UNIT="[FILL_THIS_IN]"
 
-#######################################
-# HAPROXY CONFIGURATION
-#######################################
 
-# HAProxy stats
-HAPROXY_STATS_PORT=8404
-HAPROXY_STATS_USER=admin
-HAPROXY_STATS_PASSWORD=change-this-password
+# ============================================================
+# SECTION 4: CREDENTIALS & PASSWORDS
+# Used in: Phase 3, Phase 4, Phase 5
+# ============================================================
+#
+# ⚠️  IMPORTANT: You MUST set all passwords - no defaults!
+# ⚠️  Store this file securely - it contains sensitive info!
+# ------------------------------------------------------------
 
-# HAProxy SSL/TLS
-HAPROXY_SSL_MODE=passthrough  # Options: passthrough, termination
+# Certificate password (used for ALL .p12 and .jks files)
+# This password protects your certificates - make it strong!
+# Minimum 8 characters recommended
+# Example: MyT@kS3rv3r2024!
+#
+# ⛔ DO NOT use the old default 'atakatak' - it is widely known!
+CERT_PASSWORD="[FILL_THIS_IN]"
 
-#######################################
-# FIREWALL CONFIGURATION
-#######################################
+# HAProxy statistics page credentials
+# Access at: http://localhost:8404/haproxy_stats (via SSH tunnel)
+HAPROXY_STATS_USER="admin"
+HAPROXY_STATS_PASSWORD="[FILL_THIS_IN]"
 
-# Firewall type
-FIREWALL_TYPE=ufw  # Options: ufw, iptables, firewalld
+# Email address for Let's Encrypt notifications
+# You'll receive certificate expiry warnings (90-day certs)
+# Example: admin@example.com, takadmin@yourdomain.com
+YOUR_EMAIL="[FILL_THIS_IN]"
 
-# Allow SSH from specific IP (leave empty for any)
-SSH_ALLOWED_IP=  # Example: 192.168.1.0/24
 
-#######################################
-# BACKUP CONFIGURATION
-#######################################
+# ============================================================
+# SECTION 5: TAK SERVER FILES
+# Used in: Phase 2 (Container Setup), Phase 3 (TAK Installation)
+# ============================================================
+#
+# ⛔⛔⛔ CRITICAL: READ THIS CAREFULLY ⛔⛔⛔
+#
+# The TAK Server filename has an unusual naming convention that
+# has tripped up many users. You MUST enter the EXACT filename.
+#
+# WATCH FOR:
+#   - HYPHEN (-) vs UNDERSCORE (_) - they look similar!
+#   - The pattern uses BOTH: takserver-5.5-RELEASE##_all.deb
+#                                      ^         ^
+#                                   hyphen    underscore
+#
+# CORRECT examples:
+#   takserver-5.5-RELEASE58_all.deb   ✅
+#   takserver-5.5-RELEASE62_all.deb   ✅
+#
+# WRONG examples:
+#   takserver_5.5_RELEASE58_all.deb   ❌ (all underscores)
+#   takserver-5.5-RELEASE58-all.deb   ❌ (all hyphens)
+#   takserver-5.5-RELEASE58.deb       ❌ (missing _all)
+#
+# HOW TO VERIFY:
+# 1. Go to your Downloads folder
+# 2. Look at the ACTUAL filename (not what you think it is)
+# 3. Copy it exactly, or type it character-by-character
+#
+# Download TAK Server from: https://tak.gov/products/tak-server
+# ------------------------------------------------------------
 
-# Backup location
-BACKUP_DIR=/opt/tak-backups
-BACKUP_RETENTION_DAYS=30
+# TAK Server .deb filename - EXACT filename as downloaded
+# Copy this EXACTLY from your downloaded file
+# Pattern: takserver-5.5-RELEASE##_all.deb (note: hyphen, hyphen, underscore)
+TAK_DEB_FILENAME="[FILL_THIS_IN]"
 
-# Backup schedule (cron format)
-BACKUP_SCHEDULE="0 2 * * *"  # 2 AM daily
+# TAK container hostname (usually just "tak")
+# This becomes the container name and internal hostname
+TAK_CONTAINER_NAME="tak"
 
-#######################################
-# MONITORING & LOGGING
-#######################################
+# HAProxy container hostname
+HAPROXY_CONTAINER_NAME="haproxy"
 
-# Log level
-LOG_LEVEL=INFO  # Options: DEBUG, INFO, WARNING, ERROR
 
-# Monitoring email (for alerts)
-ALERT_EMAIL=your-email@example.com
+# ============================================================
+# SECTION 6: OPTIONAL SERVICES
+# Used in: Phase 5 (Networking)
+# ============================================================
+#
+# Set to "yes" to enable, "no" to skip
+# These affect HAProxy configuration and DNS requirements
+# ------------------------------------------------------------
 
-#######################################
-# DEPLOYMENT OPTIONS
-#######################################
+# Let's Encrypt SSL certificates (recommended)
+# Provides browser-trusted certs for enrollment page
+ENABLE_LETSENCRYPT="yes"
 
-# Installation mode
-INSTALL_MODE=manual  # Options: manual, automated
+# MediaMTX - RTSP video streaming server
+# For drone feeds, surveillance cameras, etc.
+ENABLE_MEDIAMTX="no"
 
-# Skip confirmation prompts (for automation)
-AUTO_CONFIRM=false
+# NextCloud - File sharing and collaboration
+# Alternative to commercial cloud storage
+ENABLE_NEXTCLOUD="no"
 
-# Debug mode (verbose output)
-DEBUG_MODE=false
 
-#######################################
-# OPTIONAL: INTEGRATION SETTINGS
-#######################################
+# ============================================================
+# SECTION 7: DNS RECORDS CHECKLIST
+# ============================================================
+#
+# Create these DNS A records BEFORE starting Phase 5.
+# All records point to the same IP: YOUR_VPS_IP
+#
+# ┌─────────────────────────┬─────────────────┬──────────┐
+# │ Hostname                │ Type │ Value    │ Required │
+# ├─────────────────────────┼──────┼──────────┼──────────┤
+# │ tak.YOUR_BASE_DOMAIN    │ A    │ VPS IP   │ YES      │
+# │ files.YOUR_BASE_DOMAIN  │ A    │ VPS IP   │ If NC    │
+# │ rtsp.YOUR_BASE_DOMAIN   │ A    │ VPS IP   │ If MTX   │
+# └─────────────────────────┴──────┴──────────┴──────────┘
+#
+# Example for example.com with VPS IP 203.0.113.50:
+#   tak.example.com   → 203.0.113.50
+#   files.example.com → 203.0.113.50 (if using NextCloud)
+#
+# Verify with: dig tak.YOUR_BASE_DOMAIN +short
+# ============================================================
 
-# Slack webhook for notifications (optional)
-SLACK_WEBHOOK_URL=
 
-# Discord webhook for notifications (optional)
-DISCORD_WEBHOOK_URL=
+# ============================================================
+# SECTION 8: PORT REFERENCE
+# ============================================================
+#
+# These ports must be open in your VPS firewall (UFW).
+# Phase 1 covers firewall setup.
+#
+# ┌───────┬─────────────────────────────────┬──────────┐
+# │ Port  │ Service                         │ Required │
+# ├───────┼─────────────────────────────────┼──────────┤
+# │ 22    │ SSH                             │ YES      │
+# │ 80    │ HTTP (ACME/Let's Encrypt)       │ YES      │
+# │ 443   │ HTTPS (web services)            │ Optional │
+# │ 8089  │ TAK Client connections          │ YES      │
+# │ 8443  │ TAK Web UI                      │ YES      │
+# │ 8446  │ TAK Certificate Enrollment      │ YES      │
+# │ 8554  │ RTSP (MediaMTX)                 │ If MTX   │
+# │ 8404  │ HAProxy Stats (SSH tunnel only) │ Optional │
+# └───────┴─────────────────────────────────┴──────────┘
+# ============================================================
 
-# Syslog server (optional)
-SYSLOG_SERVER=
-SYSLOG_PORT=514
 
-#######################################
-# NOTES
-#######################################
-# - Never commit .env to git!
-# - Use strong passwords for production
-# - Keep TAK Server files private (Google Drive/NextCloud)
-# - Update CERT_PASSWORD from default 'atakatak'
-# - Review TAK.gov documentation for latest recommendations
+# ============================================================
+# SECTION 9: QUICK REFERENCE - VALUES BY PHASE
+# ============================================================
+#
+# PHASE 1 - LXD Setup:
+#   - YOUR_VPS_IP
+#   - YOUR_VPS_HOSTNAME
+#   - LXD_BRIDGE_NAME
+#   - LXD_BRIDGE_IP
+#
+# PHASE 2 - Container Setup:
+#   - TAK_CONTAINER_NAME
+#   - TAK_CONTAINER_IP
+#   - YOUR_TIMEZONE
+#   - TAK_DEB_FILENAME
+#
+# PHASE 3 - TAK Installation:
+#   - YOUR_DOMAIN
+#   - YOUR_ORG
+#   - YOUR_CA_NAME
+#   - YOUR_STATE
+#   - YOUR_CITY
+#   - YOUR_UNIT
+#   - CERT_PASSWORD
+#   - TAK_DEB_FILENAME
+#
+# PHASE 4 - Certificate Management:
+#   - YOUR_CA_NAME
+#   - CERT_PASSWORD
+#
+# PHASE 5 - Networking:
+#   - YOUR_DOMAIN
+#   - YOUR_BASE_DOMAIN
+#   - YOUR_VPS_IP
+#   - TAK_CONTAINER_IP
+#   - HAPROXY_CONTAINER_IP
+#   - HAPROXY_STATS_USER
+#   - HAPROXY_STATS_PASSWORD
+#   - YOUR_EMAIL (for Let's Encrypt)
+#   - CERT_PASSWORD (for JKS conversion)
+#
+# PHASE 6 - Verification:
+#   - YOUR_DOMAIN
+#   - CERT_PASSWORD
+#
+# ============================================================
+
+
+# ============================================================
+# SECTION 10: COMPUTED VALUES (DO NOT EDIT)
+# ============================================================
+#
+# These are derived from your inputs above.
+# Used by automation scripts.
+# ------------------------------------------------------------
+
+# Full CA name (generated from YOUR_CA_NAME)
+# Example: MVFD-ROOT-CA
+FULL_CA_NAME="${YOUR_CA_NAME}-ROOT-CA"
+
+# Let's Encrypt keystore filename
+# Example: tak-le.jks
+LE_KEYSTORE_FILENAME="${TAK_CONTAINER_NAME}-le.jks"
+
+# TAK Server GPG key filename (standard - doesn't change)
+TAK_GPG_KEY_FILENAME="takserver-public-gpg.key"
+
+# TAK Server policy filename (standard - doesn't change)
+TAK_POLICY_FILENAME="deb_policy.pol"
+
+
+# ============================================================
+# END OF CONFIGURATION
+# ============================================================
+#
+# NEXT STEPS:
+# 1. Verify all required fields are filled in
+# 2. Save this file securely (contains passwords!)
+# 3. Create DNS records (Section 7)
+# 4. Begin with Phase 1: LXD Setup
+#
+# Questions? Issues?
+# - TAK Syndicate: https://www.thetaksyndicate.org/
+# - GitHub Issues: https://github.com/mighkel/installTAK-LXD/issues
+#
+# ============================================================
