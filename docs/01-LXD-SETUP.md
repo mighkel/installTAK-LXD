@@ -292,80 +292,54 @@ groups | grep lxd
 
 ---
 
-## Step 4: Initialize LXD
+## Step 4: Initialize LXD and Create TAK Network
 
-This is the **most important step**. LXD needs to be configured for networking and storage.
+This step configures LXD storage and creates a dedicated network bridge for TAK deployment.
 
 🖥️ **VPS Host**
 
-### 4.1 Run LXD Init
-
+### 4.1 Run Minimal LXD Init
 ```bash
-lxd init
+lxd init --minimal
 ```
 
-### 4.2 Answer the Initialization Prompts
+This creates default storage without interactive prompts.
 
-**Follow this configuration for TAK Server deployment:**
+### 4.2 Create Dedicated TAK Network Bridge
 
-```
-Would you like to use LXD clustering? (yes/no) [default=no]: 
-→ no
-
-Do you want to configure a new storage pool? (yes/no) [default=yes]: 
-→ yes
-
-Name of the new storage pool [default=default]: 
-→ [press Enter] (keep default)
-
-Name of the storage backend to use (dir, lvm, zfs, btrfs, ceph) [default=zfs]: 
-→ dir
-
-Would you like to connect to a MAAS server? (yes/no) [default=no]: 
-→ no
-
-Would you like to create a new local network bridge? (yes/no) [default=yes]: 
-→ yes
-
-What should the new bridge be called? [default=lxdbr0]: 
-→ [press Enter] (keep lxdbr0)
-
-What IPv4 address should be used? (CIDR subnet notation, "auto" or "none") [default=auto]: 
-→ auto
-
-What IPv6 address should be used? (CIDR subnet notation, "auto" or "none") [default=auto]: 
-→ none  (IPv6 can cause issues with TAK Server)
-
-Would you like the LXD server to be available over the network? (yes/no) [default=no]: 
-→ no  (unless you're clustering, keep this no)
-
-Would you like stale cached images to be updated automatically? (yes/no) [default=yes]: 
-→ yes
-
-Would you like a YAML "lxd init" preseed to be printed? (yes/no) [default=no]: 
-→ no
-```
-
-> 💡 **TIP: Storage Backend**  
-> We use `dir` instead of `zfs` because ZFS may not be available on all VPS systems. If your VPS supports ZFS and you're comfortable with it, ZFS offers better performance and snapshot capabilities.
-
-### 4.3 Verify LXD Configuration
-
+Create a dedicated LXD network with a predictable subnet:
 ```bash
-# Check LXD network
+lxc network create takbr0 \
+  ipv4.address=10.100.100.1/24 \
+  ipv4.nat=true \
+  ipv4.dhcp=true \
+  ipv4.dhcp.ranges=10.100.100.100-10.100.100.199 \
+  ipv6.address=none
+```
+
+> 💡 **Why takbr0?**  
+> Using a dedicated bridge with a predictable subnet (`10.100.100.0/24`) means:
+> - Container IPs are always predictable (TAK = `.10`, HAProxy = `.11`)
+> - HAProxy configuration uses real IPs instead of placeholders
+> - Documentation examples work without modification
+
+### 4.3 Verify Network Configuration
+```bash
+# List networks
 lxc network list
 
 # Expected output:
-# +---------+----------+---------+-------------+---------+
-# |  NAME   |   TYPE   | MANAGED | DESCRIPTION | USED BY |
-# +---------+----------+---------+-------------+---------+
-# | lxdbr0  | bridge   | YES     |             | 0       |
-# +---------+----------+---------+-------------+---------+
+# +---------+----------+---------+----------------+---------------------------+
+# |  NAME   |   TYPE   | MANAGED |      IPV4      |           IPV6            |
+# +---------+----------+---------+----------------+---------------------------+
+# | takbr0  | bridge   | YES     | 10.100.100.1/24|                           |
+# +---------+----------+---------+----------------+---------------------------+
 
-# Check storage pool
+# Show network details
+lxc network show takbr0
+
+# Verify storage
 lxc storage list
-
-# Expected output showing 'default' storage pool
 ```
 
 ---
@@ -380,7 +354,7 @@ lxc storage list
 
 ```bash
 # Launch Ubuntu 22.04 test container
-lxc launch ubuntu:22.04 test
+lxc launch ubuntu:22.04 test --network takbr0
 
 # Wait a few seconds, then check status
 lxc list
@@ -525,7 +499,7 @@ sudo nano /etc/ufw/before.rules
 :POSTROUTING ACCEPT [0:0]
 
 # Forward traffic from LXD containers
--A POSTROUTING -s 10.0.0.0/8 -o eth0 -j MASQUERADE
+-A POSTROUTING -s 10.100.100.0/24 -o eth0 -j MASQUERADE
 
 COMMIT
 ```
@@ -538,10 +512,10 @@ COMMIT
 ### 7.3 Allow LXD Bridge Traffic
 
 ```bash
-# Allow traffic on lxdbr0
-sudo ufw allow in on lxdbr0
-sudo ufw route allow in on lxdbr0
-sudo ufw route allow out on lxdbr0
+# Allow traffic on takbr0
+sudo ufw allow in on takbr0
+sudo ufw route allow in on takbr0
+sudo ufw route allow out on takbr0
 
 # Reload UFW
 sudo ufw reload
@@ -551,7 +525,7 @@ sudo ufw reload
 
 ```bash
 # Launch another test container
-lxc launch ubuntu:22.04 nettest
+lxc launch ubuntu:22.04 nettest --network takbr0
 
 # Test internet from container
 lxc exec nettest -- ping -c 3 1.1.1.1
