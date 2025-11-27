@@ -716,7 +716,6 @@ This next guide covers:
 - Configuring firewall rules
 - DNS configuration
 - Setting up Let's Encrypt SSL certificates (for smoother auto-enrollment)
-- DNS configuration
 
 ---
 
