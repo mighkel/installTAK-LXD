@@ -33,7 +33,8 @@ See [Phase 1: LXD Setup](01-LXD-SETUP.md#document-conventions) for the full conv
 **Placeholders used in this document:**
 - `[YOUR_DOMAIN]` - Your TAK server domain (e.g., `tak.example.com`)
 - `[YOUR_VPS_IP]` - Your VPS public IP address
-- `[CONTAINER_IP]` - Container's internal IP (assigned by LXD, typically `10.x.x.x`)
+- TAK Container IP: 10.100.100.10 (static, assigned during container creation)
+- HAProxy Container IP: 10.100.100.11 (assigned in Phase 5)
 - `[##]` - TAK Server release number (e.g., `58` in `takserver-5.5-RELEASE58_all.deb`)
 
 > 💡 **PLACEHOLDER SYNTAX**
@@ -64,8 +65,11 @@ Before starting Phase 2, verify:
 ### 1.1 Launch Ubuntu Container
 
 ```bash
-# Launch Ubuntu 22.04 container named 'tak'
-lxc launch ubuntu:22.04 tak
+# Launch Ubuntu 22.04 container named 'tak' on takbr0 network
+lxc launch ubuntu:22.04 tak --network takbr0
+
+# Assign static IP for predictable networking
+lxc config device override tak eth0 ipv4.address=10.100.100.10
 
 # Wait a few seconds for it to fully start
 sleep 10
@@ -79,12 +83,12 @@ lxc list
 +------+---------+----------------------+------+------------+-----------+
 | NAME |  STATE  |         IPV4         | IPV6 |    TYPE    | SNAPSHOTS |
 +------+---------+----------------------+------+------------+-----------+
-| tak  | RUNNING | 10.x.x.x (eth0)      |      | CONTAINER  | 0         |
+| tak  | RUNNING | 10.100.100.10 (eth0) |      | CONTAINER  | 0         |
 +------+---------+----------------------+------+------------+-----------+
 ```
 
-> ⚠️ **NOTE THE IP ADDRESS**  
-> Write down your container's IP (e.g., `10.x.x.x`). You'll need it for HAProxy configuration in Phase 5. This is your `[CONTAINER_IP]`.
+💡 STATIC IP ASSIGNED
+Your TAK container IP is 10.100.100.10. This is pre-configured for the HAProxy setup in Phase 5.
 
 ### 1.2 Verify Container Networking
 
