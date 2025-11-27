@@ -686,7 +686,7 @@ Press Continue to proceed with local certificates." 0 0
         # Get FQDN but don't set up Let's Encrypt
         resolve_dns=$(curl -s https://api.hackertarget.com/reversedns/?q=$public_IP)
         IFS=' ' read -r -a resolveDNS <<< "$resolve_dns"
-        if ! [[ ${resolveDNS[1]} ]]; then
+        if [[ -n "${resolveDNS[1]}" ]]; then
             FQDName=${resolveDNS[1]}
         else
             FQDName=$public_IP
@@ -1157,7 +1157,7 @@ postInstallVerification(){
         echo -e "${GREEN}================================${NC}" 2>&1 | tee -a $logfile
         echo -e "${GREEN}TAK Server Installation Complete${NC}" 2>&1 | tee -a $logfile
         echo -e "${GREEN}================================${NC}" 2>&1 | tee -a $logfile
-        echo -e "Web Admin: https://\$(hostname -f):8443" 2>&1 | tee -a $logfile
+        echo -e "Web Admin: https://${HOSTNAME}:8443" 2>&1 | tee -a $logfile
         echo -e "Admin Certificate: $homeDir/webadmin.p12" 2>&1 | tee -a $logfile
         
         if [[ $certAEnrollment = 0 ]]; then
