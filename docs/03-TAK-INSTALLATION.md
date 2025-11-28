@@ -546,7 +546,8 @@ ls -lh
 
 ```bash
 # Enrollment package for ATAK clients
-ls -lh /root/enrollmentDP.zip
+cd 
+ls -lh enrollmentDP.zip
 
 # This file will be distributed to ATAK users
 ```
