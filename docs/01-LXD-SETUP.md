@@ -612,7 +612,7 @@ echo -n "Can run lxc without sudo: "
 lxc list &>/dev/null && echo "✅" || echo "❌"
 
 echo -n "LXD network exists: "
-lxc network list | grep -q lxdbr0 && echo "✅" || echo "❌"
+lxc network list | grep -q takbr0 && echo "✅" || echo "❌"
 
 echo -n "Storage pool exists: "
 lxc storage list | grep -q default && echo "✅" || echo "❌"
@@ -666,7 +666,7 @@ groups | grep lxd
 2. **UFW routing:**
    ```bash
    sudo ufw status verbose
-   # Should show lxdbr0 allowed
+   # Should show takbr0 allowed
    ```
 
 3. **NAT rules:**
@@ -691,8 +691,8 @@ ZFS may not be available on all VPS systems. If init fails, run again and choose
 **Solution - Disable IPv6 in LXD:**
 
 ```bash
-lxc network set lxdbr0 ipv6.address none
-lxc network show lxdbr0
+lxc network set takbr0 ipv6.address none
+lxc network show takbr0
 ```
 
 ---
