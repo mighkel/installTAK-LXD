@@ -65,7 +65,7 @@ Internet
     ↓
 VPS ([YOUR_VPS_IP])
     ↓
-LXD Bridge (lxdbr0)
+LXD Bridge (takbr0)
     ↓
 TAK Container ([TAK_CONTAINER_IP])
     ↓
