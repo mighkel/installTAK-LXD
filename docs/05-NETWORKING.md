@@ -185,8 +185,9 @@ If using LXD proxy, skip HAProxy sections and jump to [Step 7: Verify External A
 🖥️ **VPS Host**
 
 ```bash
-# Create HAProxy container
-lxc launch ubuntu:22.04 haproxy
+# Create HAProxy container on takbr0 network with static IP
+lxc launch ubuntu:22.04 haproxy --network takbr0
+lxc config device override haproxy eth0 ipv4.address=10.100.100.11
 
 # Wait for start
 sleep 10
@@ -194,7 +195,11 @@ sleep 10
 # Verify running
 lxc list
 
-# Note the HAProxy container IP - you'll need it
+# Verify static IP assignment
+lxc list
+
+# Expected:
+# | haproxy | RUNNING | 10.100.100.11 (eth0) |
 ```
 
 ### 3.2 Install HAProxy
@@ -292,16 +297,19 @@ sleep 10
 lxc list -c n4
 ```
 
-**Example output:**
+**Output:**
 ```
-+----------+---------------------+
-|   NAME   |        IPV4         |
-+----------+---------------------+
-| tak      | 10.x.x.11           |
-| haproxy  | 10.x.x.12           |
-| mediamtx | 10.x.x.13           |
-| nextcloud| 10.x.x.14           |
-+----------+---------------------+
+**Container IPs (Pre-configured):**
+
+| Container | IP Address | Purpose |
+|-----------|------------|---------|
+| tak | 10.100.100.10 | TAK Server |
+| haproxy | 10.100.100.11 | Reverse Proxy |
+| mediamtx | 10.100.100.12 | Video Streaming (optional) |
+| nextcloud | 10.100.100.13 | File Sharing (optional) |
+
+> 💡 These IPs are assigned during container creation using static IP configuration.
+> The HAProxy template in `examples/haproxy.cfg` uses these exact addresses.
 ```
 
 > ⚠️ **DOCUMENT YOUR IPS**
@@ -311,237 +319,42 @@ lxc list -c n4
 > ```
 > You'll need these for the HAProxy configuration below.
 
-### 4.4 Create Multi-Service HAProxy Configuration
+### 4.4 Download HAProxy Configuration Template
 
 📦 **Inside HAProxy Container**
-
 ```bash
-lxc exec haproxy -- bash
-nano /etc/haproxy/haproxy.cfg
+# Backup original config
+sudo cp /etc/haproxy/haproxy.cfg /etc/haproxy/haproxy.cfg.original
+
+# Download pre-configured template
+cd /etc/haproxy
+sudo wget -O haproxy.cfg https://raw.githubusercontent.com/mighkel/installTAK-LXD/main/examples/haproxy.cfg
 ```
 
-**Paste this configuration:**
-
-```haproxy
-global
-    log /dev/log    local0
-    log /dev/log    local1 notice
-    chroot /var/lib/haproxy
-    stats socket /run/haproxy/admin.sock mode 660 level admin
-    stats timeout 30s
-    user haproxy
-    group haproxy
-    daemon
-
-    # SSL/TLS configuration
-    ca-base /etc/ssl/certs
-    crt-base /etc/ssl/private
-    ssl-default-bind-ciphers ECDHE+AESGCM:ECDHE+CHACHA20:!RSA
-    ssl-default-bind-options ssl-min-ver TLSv1.2
-    
-    # Performance tuning
-    maxconn 4096
-    tune.ssl.default-dh-param 2048
-
-defaults
-    log     global
-    mode    tcp
-    option  tcplog
-    option  dontlognull
-    timeout connect 5s
-    timeout client  1m
-    timeout server  1m
-    errorfile 400 /etc/haproxy/errors/400.http
-    errorfile 403 /etc/haproxy/errors/403.http
-    errorfile 408 /etc/haproxy/errors/408.http
-    errorfile 500 /etc/haproxy/errors/500.http
-    errorfile 502 /etc/haproxy/errors/502.http
-    errorfile 503 /etc/haproxy/errors/503.http
-    errorfile 504 /etc/haproxy/errors/504.http
-
-#============================================================
-# TAK SERVER - TCP PASSTHROUGH (Mutual TLS)
-#============================================================
-
-# TAK Client Connections (Port 8089)
-frontend tak-client
-    bind *:8089
-    mode tcp
-    option tcplog
-    tcp-request inspect-delay 5s
-    tcp-request content accept if { req.ssl_hello_type 1 }
-    default_backend tak-client-backend
-
-backend tak-client-backend
-    mode tcp
-    option ssl-hello-chk
-    server tak1 [TAK_CONTAINER_IP]:8089 check
-
-# TAK Web UI (Port 8443)
-frontend tak-webui
-    bind *:8443
-    mode tcp
-    option tcplog
-    tcp-request inspect-delay 5s
-    tcp-request content accept if { req.ssl_hello_type 1 }
-    default_backend tak-webui-backend
-
-backend tak-webui-backend
-    mode tcp
-    option ssl-hello-chk
-    server takweb [TAK_CONTAINER_IP]:8443 check
-
-# TAK Certificate Enrollment (Port 8446)
-frontend tak-enrollment
-    bind *:8446
-    mode tcp
-    option tcplog
-    tcp-request inspect-delay 5s
-    tcp-request content accept if { req.ssl_hello_type 1 }
-    default_backend tak-enrollment-backend
-
-backend tak-enrollment-backend
-    mode tcp
-    option ssl-hello-chk
-    server takenroll [TAK_CONTAINER_IP]:8446 check
-
-#============================================================
-# HTTP/HTTPS - WEB SERVICES WITH SNI ROUTING
-#============================================================
-
-# HTTP Frontend (Port 80)
-# Handles: ACME challenges, HTTP redirects
-frontend http-in
-    bind *:80
-    mode http
-    option httplog
-    
-    # ACME Challenge routing for Let's Encrypt
-    acl is_acme_challenge path_beg /.well-known/acme-challenge/
-    
-    # Route ACME challenges to TAK container (has certbot)
-    use_backend tak-acme-backend if is_acme_challenge
-    
-    # Domain-based routing (uncomment as needed)
-    # acl host_files hdr(host) -i files.[YOUR_BASE_DOMAIN]
-    # use_backend nextcloud-backend if host_files
-    
-    # Default: Redirect to HTTPS
-    http-request redirect scheme https code 301 unless is_acme_challenge
-
-backend tak-acme-backend
-    mode http
-    server tak [TAK_CONTAINER_IP]:80 check
-
-# Uncomment when NextCloud/file sharing is configured:
-# backend nextcloud-backend
-#     mode http
-#     server nextcloud1 [NEXTCLOUD_CONTAINER_IP]:80 check
-
-# HTTPS Frontend (Port 443) - SNI-based routing
-# Uncomment this section when you have HTTPS web services
-# frontend https-in
-#     bind *:443
-#     mode tcp
-#     option tcplog
-#     tcp-request inspect-delay 5s
-#     tcp-request content accept if { req.ssl_hello_type 1 }
-#     
-#     # SNI-based routing
-#     acl host_files req.ssl_sni -i files.[YOUR_BASE_DOMAIN]
-#     
-#     use_backend nextcloud-ssl-backend if host_files
-#     
-#     # Default backend
-#     default_backend nextcloud-ssl-backend
-
-# backend nextcloud-ssl-backend
-#     mode tcp
-#     option ssl-hello-chk
-#     server nextcloud1 [NEXTCLOUD_CONTAINER_IP]:443 check
-
-#============================================================
-# MEDIAMTX - RTSP VIDEO STREAMING (Port 8554)
-#============================================================
-
-# Uncomment when MediaMTX is configured:
-# frontend rtsp-in
-#     bind *:8554
-#     mode tcp
-#     option tcplog
-#     default_backend rtsp-backend
-
-# backend rtsp-backend
-#     mode tcp
-#     server mediamtx1 [MEDIAMTX_CONTAINER_IP]:8554 check
-
-#============================================================
-# HAPROXY STATISTICS & MONITORING
-#============================================================
-
-listen stats
-    bind *:8404
-    mode http
-    stats enable
-    stats uri /haproxy_stats
-    stats refresh 30s
-    stats auth admin:[STATS_PASSWORD]
-    stats admin if TRUE
+### 4.5 Customize the Configuration
+```bash
+sudo nano /etc/haproxy/haproxy.cfg
 ```
 
-> ⚠️ **USER CONFIGURATION REQUIRED**
-> 
-> **Required changes:**
-> 1. Replace `[TAK_CONTAINER_IP]` with your TAK container IP (e.g., `10.x.x.11`)
-> 2. Replace `[STATS_PASSWORD]` with a secure password
-> 
-> **Optional changes (uncomment sections as needed):**
-> 3. Replace `[YOUR_BASE_DOMAIN]` with your domain (e.g., `example.com`)
-> 4. Replace `[NEXTCLOUD_CONTAINER_IP]` when adding file sharing
-> 5. Replace `[MEDIAMTX_CONTAINER_IP]` when adding video streaming
+**Replace these placeholders:**
 
-**Save and exit** (Ctrl+X, Y, Enter)
+| Find | Replace With | Example |
+|------|--------------|---------|
+| `[YOUR_DOMAIN]` | Your TAK FQDN | `tak.example.com` |
+| `[YOUR_BASE_DOMAIN]` | Your base domain | `example.com` |
+| `[STATS_PASSWORD]` | Secure password | `MyS3cur3P@ss!` |
 
-### 4.5 Adding Services Later
+> 💡 **Note:** The container IPs (`10.100.100.10`, `10.100.100.11`) are already
+> configured in the template to match the static IPs assigned in earlier steps.
 
-**To add a new service:**
-
-1. **Create container:**
-   ```bash
-   lxc launch ubuntu:22.04 newservice
-   lxc list newservice  # Note the IP
-   ```
-
-2. **Edit HAProxy config:**
-   ```bash
-   lxc exec haproxy -- nano /etc/haproxy/haproxy.cfg
-   ```
-   - Uncomment relevant sections
-   - Add ACL for domain routing
-   - Add backend with container IP
-
-3. **Reload HAProxy:**
-   ```bash
-   lxc exec haproxy -- systemctl reload haproxy
-   ```
-
-4. **Add DNS record:**
-   - Create A record: `newservice.[YOUR_BASE_DOMAIN]` → `[YOUR_VPS_IP]`
-
-5. **Forward port (if new port):**
-   ```bash
-   lxc config device add haproxy proxy-XXXX proxy \
-       listen=tcp:0.0.0.0:XXXX \
-       connect=tcp:127.0.0.1:XXXX
-   ```
-
-### 4.6 Test Configuration
-
+### 4.6 Verify and Start HAProxy
 ```bash
-# Test config syntax
-haproxy -c -f /etc/haproxy/haproxy.cfg
+# Test configuration syntax
+sudo haproxy -c -f /etc/haproxy/haproxy.cfg
 
-# Expected: Configuration file is valid
+# If valid, restart HAProxy
+sudo systemctl restart haproxy
+sudo systemctl status haproxy
 ```
 
 ### 4.7 Start HAProxy
