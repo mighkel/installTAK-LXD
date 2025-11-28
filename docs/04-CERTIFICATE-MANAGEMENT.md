@@ -183,7 +183,7 @@ Auto-enrollment allows ATAK/WinTAK clients to automatically request and receive 
 
 ```bash
 # Check for enrollment package
-ls -lh /root/enrollmentDP.zip
+ls -lh /home/takadmin/enrollmentDP.zip
 ls -lh /opt/tak/certs/files/enrollmentDP.zip
 
 # View contents without extracting
