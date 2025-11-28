@@ -148,47 +148,46 @@ lxc exec tak -- ls -lh /home/takadmin/takserver-install/
 
 ---
 
-## Step 2: Clone installTAK Script
+## Step 2: Download installTAK-LXD Script
 
-The installTAK script automates the TAK Server installation process.
+The installTAK-LXD script is a modified version optimized for LXD container deployments.
 
 📦 **Inside Container** (as takadmin)
 
-### 2.1 Clone the Repository
-
+### 2.1 Download the Script
 ```bash
 cd /home/takadmin/takserver-install
 
-# Clone the installTAK repository
-git clone https://github.com/myTeckNet/installTAK.git
+# Download the LXD-optimized installation script
+wget https://raw.githubusercontent.com/mighkel/installTAK-LXD/main/installTAK-LXD.sh
 
-# Enter directory
-cd installTAK
+# Make it executable
+chmod +x installTAK-LXD.sh
 
-# Verify script is present
-ls -lh installTAK
+# Verify
+ls -lh installTAK-LXD.sh
 ```
 
-### 2.2 Move TAK Files into installTAK Directory
+> 💡 **What's Different?**  
+> The `installTAK-LXD.sh` script includes these LXD-specific enhancements:
+> - Defers Let's Encrypt setup to Phase 5 (after networking is configured)
+> - Verifies container networking before installation
+> - Handles PostgreSQL initialization in containers
+> - Provides LXD-specific post-installation guidance
 
+### 2.2 Verify All Required Files
 ```bash
-# Move TAK Server files into installTAK directory
-mv ../takserver-5.5-RELEASE[##]_all.deb .
-mv ../takserver-public-gpg.key .
-mv ../deb_policy.pol .
-
-# Verify all required files are present
+# Should show:
 ls -lh
 
-# Should show:
-# - installTAK (script)
+# - installTAK-LXD.sh (script)
 # - takserver-5.5-RELEASE[##]_all.deb
 # - takserver-public-gpg.key
 # - deb_policy.pol
 ```
 
-> ⚠️ **USER CONFIGURATION REQUIRED**
-> Replace `[##]` with your actual release number in the mv command.
+> ⚠️ **USER CONFIGURATION REQUIRED**  
+> Ensure all four files are present before proceeding.
 
 ---
 
@@ -202,25 +201,27 @@ ls -lh
 ### 3.1 Make Script Executable
 
 ```bash
-# Make installTAK executable
-chmod +x installTAK
-
-# Verify permissions
-ls -lh installTAK
+# Already made executable in Step 2
+# Verify it's ready
+ls -lh installTAK-LXD.sh
 ```
 
 ### 3.2 Run the Installation
 
 ```bash
-# Run installTAK with the .deb file
-sudo ./installTAK takserver-5.5-RELEASE[##]_all.deb
-
-# The script will start installing prerequisites
-# This takes 5-10 minutes
+# Run installTAK-LXD with LXD mode enabled
+sudo ./installTAK-LXD.sh takserver-5.5-RELEASE[##]_all.deb false true
 ```
 
 > ⚠️ **USER CONFIGURATION REQUIRED**
 > Replace `[##]` with your actual release number.
+
+> 💡 **Script Arguments**
+> - `takserver-5.5-RELEASE[##]_all.deb` - Your TAK Server .deb file
+> - `false` - FIPS mode (false for standard deployment)  
+> - `true` - **LXD mode** (enables container-specific features)
+>
+> The `true` at the end is critical - it enables LXD mode which defers Let's Encrypt to Phase 5.
 
 ---
 
@@ -343,7 +344,17 @@ Enter your choice:
 → Certificate requests only  (simplest and most secure)
 ```
 
-### 4.8 FQDN Configuration
+### 4.8 FQDN Configuration  (LXD Mode)
+
+When running in LXD mode, the script handles FQDN differently:
+
+1. **A dialog appears** explaining that Let's Encrypt is deferred to Phase 5
+2. **Enter your domain** (e.g., `tak.example.com`) when prompted
+3. **The FQDN is saved** to `/opt/tak/fqdn-for-letsencrypt.txt` for later use
+
+> ⛔ **IMPORTANT**  
+> In LXD mode, choose **Local (self-signed)** when asked about certificate trust.
+> Let's Encrypt will be configured in Phase 5 after HAProxy and port forwarding are set up.
 
 ```
 Does this TAK Server have a Fully Qualified Domain Name (FQDN)? (y/n): 
