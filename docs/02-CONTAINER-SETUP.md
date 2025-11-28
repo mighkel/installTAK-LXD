@@ -68,11 +68,13 @@ Before starting Phase 2, verify:
 # Launch Ubuntu 22.04 container named 'tak' on takbr0 network
 lxc launch ubuntu:22.04 tak --network takbr0
 
-# Assign static IP for predictable networking
-lxc config device override tak eth0 ipv4.address=10.100.100.10
+# Wait for container to start
+sleep 5
 
-# Wait a few seconds for it to fully start
-sleep 10
+# Assign static IP for predictable networking
+lxc stop tak
+lxc config device set tak eth0 ipv4.address=10.100.100.10
+lxc start tak
 
 # Verify it's running
 lxc list
