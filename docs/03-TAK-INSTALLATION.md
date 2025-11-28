@@ -594,7 +594,7 @@ ls -lh ~/enrollmentDP.zip
 
 ```bash
 # Copy webadmin.p12 to host
-lxc file pull tak/home/takadmin/enrollmentDP.zip ~/webadmin.p12
+lxc file pull tak/home/takadmin/webadmin.p12 ~/webadmin.p12
 
 # This certificate is needed to access TAK Server web UI
 ```
