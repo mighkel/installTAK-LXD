@@ -458,7 +458,7 @@ TAK Server is running on:
 # Check if TAK Server is running
 sudo systemctl status takserver
 
-# Expected output: active (running)
+# Expected output: active (exited)
 ```
 
 **If not running:**
