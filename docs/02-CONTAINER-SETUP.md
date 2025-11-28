@@ -717,7 +717,7 @@ lxc restart tak
 🖥️ **VPS Host**
 ```bash
 # Check LXD network
-lxc network show lxdbr0
+lxc network show takbr0
 
 # Verify IPv4 address range matches container IP
 ```
