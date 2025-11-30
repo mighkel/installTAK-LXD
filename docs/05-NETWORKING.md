@@ -187,7 +187,6 @@ If using LXD proxy, skip HAProxy sections and jump to [Step 7: Verify External A
 ```bash
 # Create HAProxy container on takbr0 network with static IP
 lxc launch ubuntu:22.04 haproxy --network takbr0
-lxc config device override haproxy eth0 ipv4.address=10.100.100.11
 
 # Wait for container to start
 sleep 5
