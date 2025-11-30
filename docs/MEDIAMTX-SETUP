@@ -1,0 +1,695 @@
+# MediaMTX Video Streaming Setup
+
+**Supplemental Guide: Adding RTSP video streaming to your TAK deployment**
+
+This guide adds a MediaMTX container for streaming video (drone feeds, IP cameras, etc.) to TAK clients.
+
+---
+
+## Document Conventions
+
+See [Phase 1: LXD Setup](01-LXD-SETUP.md#document-conventions) for the full conventions guide.
+
+**Quick Reference:**
+| Symbol | Meaning |
+|--------|---------|
+| 🖥️ | **VPS Host** - Commands run on the VPS via SSH (outside containers) |
+| 📦 | **Inside Container** - Commands run inside an LXD container |
+| ⚠️ | **User Configuration Required** - Replace placeholder values |
+
+**Where Am I? (Check Your Prompt)**
+| Prompt Looks Like | You Are |
+|-------------------|---------|
+| `takadmin@your-vps:~$` | 🖥️ VPS Host |
+| `root@mediamtx:~#` | 📦 Inside MediaMTX container |
+
+**Container IPs:**
+| Container | IP Address |
+|-----------|------------|
+| tak | 10.100.100.10 |
+| haproxy | 10.100.100.11 |
+| mediamtx | 10.100.100.12 |
+
+---
+
+## Prerequisites
+
+Before starting this guide, verify:
+
+- [ ] Completed Phases 1-6 of main deployment
+- [ ] TAK Server is running and accessible
+- [ ] HAProxy is configured and working
+- [ ] You have a video source to test (drone, IP camera, or test stream)
+
+---
+
+## What is MediaMTX?
+
+MediaMTX (formerly rtsp-simple-server) is a lightweight media server that supports:
+
+- **RTSP** - Real-Time Streaming Protocol (standard for IP cameras/drones)
+- **RTMP** - Real-Time Messaging Protocol (streaming platforms)
+- **HLS** - HTTP Live Streaming (web browser playback)
+- **WebRTC** - Browser-based real-time video
+
+For TAK deployments, RTSP is the primary protocol used by ATAK's video player.
+
+---
+
+## Step 1: Create MediaMTX Container
+
+🖥️ **VPS Host**
+
+### 1.1 Launch Container
+
+```bash
+# Create MediaMTX container on takbr0 network
+lxc launch ubuntu:22.04 mediamtx --network takbr0
+
+# Wait for container to start
+sleep 5
+
+# Assign static IP
+lxc stop mediamtx
+lxc config device set mediamtx eth0 ipv4.address=10.100.100.12
+lxc start mediamtx
+
+# Verify
+lxc list
+```
+
+**Expected output:**
+```
++----------+---------+-----------------------+------+-----------+-----------+
+|   NAME   |  STATE  |         IPV4          | IPV6 |   TYPE    | SNAPSHOTS |
++----------+---------+-----------------------+------+-----------+-----------+
+| haproxy  | RUNNING | 10.100.100.11 (eth0)  |      | CONTAINER | 0         |
++----------+---------+-----------------------+------+-----------+-----------+
+| mediamtx | RUNNING | 10.100.100.12 (eth0)  |      | CONTAINER | 0         |
++----------+---------+-----------------------+------+-----------+-----------+
+| tak      | RUNNING | 10.100.100.10 (eth0)  |      | CONTAINER | 0         |
++----------+---------+-----------------------+------+-----------+-----------+
+```
+
+### 1.2 Verify Networking
+
+```bash
+# Test internet connectivity
+lxc exec mediamtx -- ping -c 3 1.1.1.1
+
+# Test DNS
+lxc exec mediamtx -- ping -c 3 google.com
+```
+
+---
+
+## Step 2: Install MediaMTX
+
+📦 **Inside MediaMTX Container**
+
+### 2.1 Access Container
+
+🖥️ **VPS Host**
+
+```bash
+lxc exec mediamtx -- bash
+```
+
+### 2.2 Update System
+
+📦 **Inside MediaMTX Container**
+
+```bash
+apt update && apt upgrade -y
+apt install -y wget nano curl
+```
+
+### 2.3 Download MediaMTX
+
+```bash
+# Create directory
+mkdir -p /opt/mediamtx
+cd /opt/mediamtx
+
+# Download latest release (check https://github.com/bluenviron/mediamtx/releases for current version)
+wget https://github.com/bluenviron/mediamtx/releases/download/v1.9.3/mediamtx_v1.9.3_linux_amd64.tar.gz
+
+# Extract
+tar -xzf mediamtx_v1.9.3_linux_amd64.tar.gz
+
+# Verify
+ls -lh
+# Should show: mediamtx (binary) and mediamtx.yml (config)
+```
+
+> 💡 **TIP:** Check [MediaMTX releases](https://github.com/bluenviron/mediamtx/releases) for the latest version number and update the wget URL accordingly.
+
+### 2.4 Basic Configuration
+
+```bash
+nano /opt/mediamtx/mediamtx.yml
+```
+
+**Key settings to verify/modify:**
+
+```yaml
+# RTSP settings
+rtsp: yes
+protocols: [tcp]
+rtspAddress: :8554
+
+# RTMP settings (optional - for OBS streaming, etc.)
+rtmp: yes
+rtmpAddress: :1935
+
+# HLS settings (optional - for web browser playback)
+hls: yes
+hlsAddress: :8888
+
+# WebRTC settings (optional)
+webrtc: yes
+webrtcAddress: :8889
+
+# Authentication (optional but recommended for production)
+# See Step 8 for authentication setup
+```
+
+Save and exit (Ctrl+X, Y, Enter).
+
+> ⚠️ **IMPORTANT: TCP-Only Protocol**  
+> The `protocols: [tcp]` setting is required when using HAProxy as a reverse proxy. HAProxy operates at the TCP layer and cannot properly proxy UDP streams. Using UDP will cause "Muxing Video Failed" errors in TAK ICU and connection failures in other clients.
+
+---
+
+## Step 3: Create Systemd Service
+
+📦 **Inside MediaMTX Container**
+
+### 3.1 Create Service File
+
+```bash
+nano /etc/systemd/system/mediamtx.service
+```
+
+**Paste this content:**
+
+```ini
+[Unit]
+Description=MediaMTX RTSP Server
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/mediamtx
+ExecStart=/opt/mediamtx/mediamtx /opt/mediamtx/mediamtx.yml
+Restart=always
+RestartSec=5
+User=root
+
+[Install]
+WantedBy=multi-user.target
+```
+
+Save and exit.
+
+### 3.2 Enable and Start Service
+
+```bash
+# Reload systemd
+systemctl daemon-reload
+
+# Enable on boot
+systemctl enable mediamtx
+
+# Start service
+systemctl start mediamtx
+
+# Check status
+systemctl status mediamtx
+```
+
+**Expected output:** Active (running)
+
+### 3.3 Verify Ports
+
+```bash
+# Check listening ports
+ss -tulpn | grep mediamtx
+
+# Should show:
+# *:8554 (RTSP)
+# *:1935 (RTMP) if enabled
+# *:8888 (HLS) if enabled
+```
+
+Exit container:
+```bash
+exit
+```
+
+---
+
+## Step 4: Configure HAProxy
+
+📦 **Inside HAProxy Container**
+
+🖥️ **VPS Host**
+
+```bash
+lxc exec haproxy -- bash
+```
+
+### 4.1 Edit HAProxy Configuration
+
+📦 **Inside HAProxy Container**
+
+```bash
+nano /etc/haproxy/haproxy.cfg
+```
+
+**Add these sections** (or uncomment if using the template):
+
+```haproxy
+#============================================================
+# MEDIAMTX - RTSP VIDEO STREAMING (Port 8554)
+#============================================================
+
+frontend rtsp-in
+    bind *:8554
+    mode tcp
+    option tcplog
+    default_backend mediamtx-rtsp-backend
+
+backend mediamtx-rtsp-backend
+    mode tcp
+    server mediamtx 10.100.100.12:8554 check
+```
+
+**Optional - Add RTMP if needed:**
+
+```haproxy
+# RTMP Streaming (Port 1935) - for OBS, etc.
+frontend rtmp-in
+    bind *:1935
+    mode tcp
+    option tcplog
+    default_backend mediamtx-rtmp-backend
+
+backend mediamtx-rtmp-backend
+    mode tcp
+    server mediamtx 10.100.100.12:1935 check
+```
+
+Save and exit.
+
+### 4.2 Test and Reload HAProxy
+
+```bash
+# Test configuration
+haproxy -c -f /etc/haproxy/haproxy.cfg
+
+# If valid, reload
+systemctl reload haproxy
+systemctl status haproxy
+```
+
+Exit container:
+```bash
+exit
+```
+
+---
+
+## Step 5: Configure Port Forwarding
+
+🖥️ **VPS Host**
+
+### 5.1 Add LXD Proxy Devices
+
+```bash
+# RTSP port (required)
+lxc config device add haproxy rtsp proxy \
+  listen=tcp:0.0.0.0:8554 \
+  connect=tcp:10.100.100.11:8554
+
+# RTMP port (optional - for OBS streaming)
+lxc config device add haproxy rtmp proxy \
+  listen=tcp:0.0.0.0:1935 \
+  connect=tcp:10.100.100.11:1935
+```
+
+### 5.2 Update Firewall
+
+```bash
+# Allow RTSP
+sudo ufw allow 8554/tcp comment 'RTSP Video'
+
+# Allow RTMP (optional)
+sudo ufw allow 1935/tcp comment 'RTMP Streaming'
+
+# Verify
+sudo ufw status numbered
+```
+
+---
+
+## Step 6: Test Video Streaming
+
+### 6.1 Test with FFmpeg (from any machine)
+
+**Generate a test stream:**
+
+```bash
+# From any Linux machine with ffmpeg installed
+ffmpeg -re -f lavfi -i testsrc=size=640x480:rate=30 \
+  -f lavfi -i sine=frequency=1000:sample_rate=44100 \
+  -c:v libx264 -preset ultrafast -tune zerolatency \
+  -c:a aac -f rtsp rtsp://[YOUR_VPS_IP]:8554/test
+```
+
+> ⚠️ **USER CONFIGURATION REQUIRED**  
+> Replace `[YOUR_VPS_IP]` with your VPS public IP address.
+
+### 6.2 View Test Stream
+
+**Using ffplay (recommended):**
+```bash
+ffplay -rtsp_transport tcp rtsp://[YOUR_VPS_IP]:8554/test
+```
+
+> 💡 The `-rtsp_transport tcp` flag is required since MediaMTX is configured for TCP-only.
+
+**Using VLC:**
+
+VLC requires TCP transport configuration. Use the command line:
+
+```bash
+vlc --demux=live555 rtsp://[YOUR_VPS_IP]:8554/test
+```
+
+If you see "satip stream error", VLC is using the wrong module. The `--demux=live555` flag forces the correct RTSP handler.
+
+> ⚠️ **VLC Troubleshooting:** If VLC still fails, use ffplay instead. VLC's RTSP handling can be inconsistent with TCP-only streams.
+
+### 6.3 Test with TAK ICU (Android)
+
+TAK ICU is an Android app that streams video from your phone's camera to an RTSP server.
+
+1. Install **TAK ICU** from Play Store
+2. Open TAK ICU
+3. Configure RTSP output:
+   - **URL:** `rtsp://[YOUR_DOMAIN]:8554/live/[CALLSIGN]icu`
+   - Example: `rtsp://rtsp.example.com:8554/live/ALPHA1icu`
+4. Tap **Start Streaming**
+
+> 💡 **Stream Path:** TAK ICU publishes to whatever path you specify. The `live/` prefix is a convention but not required. MediaMTX accepts any path by default.
+
+### 6.4 View Stream in ATAK
+
+1. Open ATAK
+2. Tap Menu (three lines) → Video
+3. Tap + to add new video alias
+4. Configure:
+   - **Alias:** TAK ICU Feed (or any name)
+   - **URL:** `rtsp://[YOUR_DOMAIN]:8554/live/[CALLSIGN]icu`
+5. Tap the video entry to view
+
+> ⚠️ **Same Device Limitation:** If streaming from TAK ICU and viewing in ATAK on the same device, the video may freeze intermittently due to resource contention. Use separate devices for reliable viewing.
+
+---
+
+## Step 7: Real-World Video Sources
+
+### 7.1 IP Cameras
+
+Most IP cameras output RTSP. Configure MediaMTX to pull from the camera:
+
+📦 **Inside MediaMTX Container**
+
+```bash
+nano /opt/mediamtx/mediamtx.yml
+```
+
+**Add path configuration:**
+
+```yaml
+paths:
+  camera1:
+    source: rtsp://username:password@192.168.1.100:554/stream1
+    sourceOnDemand: yes
+```
+
+The stream will be available at: `rtsp://[YOUR_VPS_IP]:8554/camera1`
+
+### 7.2 DJI Drones
+
+DJI drones typically use RTMP. Push from the controller/app to MediaMTX:
+
+**RTMP URL:** `rtmp://[YOUR_VPS_IP]:1935/drone1`
+
+The stream will be available as RTSP at: `rtsp://[YOUR_VPS_IP]:8554/drone1`
+
+### 7.3 OBS Studio
+
+For desktop streaming:
+
+1. Open OBS
+2. Settings → Stream
+3. Service: Custom
+4. Server: `rtmp://[YOUR_VPS_IP]:1935/obs`
+5. Stream Key: (leave blank or use any name)
+
+The stream will be available at: `rtsp://[YOUR_VPS_IP]:8554/obs`
+
+---
+
+## Step 8: Security Configuration (Recommended)
+
+### 8.1 Enable Authentication
+
+📦 **Inside MediaMTX Container**
+
+```bash
+lxc exec mediamtx -- bash
+nano /opt/mediamtx/mediamtx.yml
+```
+
+**Add authentication settings:**
+
+```yaml
+# Publisher authentication (who can push streams)
+paths:
+  all:
+    publishUser: publisher
+    publishPass: [PUBLISH_PASSWORD]
+    
+    # Reader authentication (who can view streams)
+    readUser: viewer
+    readPass: [READ_PASSWORD]
+```
+
+> ⚠️ **USER CONFIGURATION REQUIRED**  
+> Replace `[PUBLISH_PASSWORD]` and `[READ_PASSWORD]` with secure passwords.
+
+**Restart MediaMTX:**
+```bash
+systemctl restart mediamtx
+```
+
+### 8.2 Path-Specific Permissions
+
+For more granular control:
+
+```yaml
+paths:
+  # Public streams (no auth required to view)
+  public:
+    publishUser: admin
+    publishPass: [ADMIN_PASSWORD]
+    # No readUser/readPass = public viewing
+    
+  # Private streams (auth required)
+  private:
+    publishUser: admin
+    publishPass: [ADMIN_PASSWORD]
+    readUser: team
+    readPass: [TEAM_PASSWORD]
+```
+
+---
+
+## Step 9: Create Snapshot
+
+🖥️ **VPS Host**
+
+```bash
+# Create snapshot of configured MediaMTX container
+lxc snapshot mediamtx mediamtx-configured
+
+# Verify
+lxc info mediamtx | grep -A 5 Snapshots
+```
+
+---
+
+## Verification Checklist
+
+- [ ] MediaMTX container running with static IP (10.100.100.12)
+- [ ] MediaMTX service active and enabled
+- [ ] Protocols set to TCP-only in mediamtx.yml
+- [ ] HAProxy configured with RTSP backend
+- [ ] Port 8554 forwarded and open in firewall
+- [ ] TAK ICU can publish without "Muxing Video Failed" error
+- [ ] Stream viewable with ffplay (using `-rtsp_transport tcp`)
+- [ ] Stream viewable in ATAK
+- [ ] Snapshot created
+
+---
+
+## Troubleshooting
+
+### Issue: TAK ICU "Muxing Video Failed (2)"
+
+**Cause:** MediaMTX is configured for UDP but HAProxy requires TCP.
+
+**Solution:** Set protocols to TCP-only in mediamtx.yml:
+
+```bash
+lxc exec mediamtx -- nano /opt/mediamtx/mediamtx.yml
+```
+
+Change:
+```yaml
+protocols: [tcp]
+```
+
+Restart:
+```bash
+lxc exec mediamtx -- systemctl restart mediamtx
+```
+
+### Issue: "404 Not Found" when viewing stream
+
+**Cause:** The stream path doesn't exist - no one is publishing to it.
+
+**Verify active streams:**
+```bash
+# Check MediaMTX API for active paths
+lxc exec mediamtx -- curl -s http://localhost:9997/v3/paths/list
+
+# Watch logs while starting a broadcast
+lxc exec mediamtx -- journalctl -u mediamtx -f
+```
+
+Streams only exist while something is actively publishing. Start TAK ICU before trying to view.
+
+### Issue: VLC "satip stream error" or can't connect
+
+**Cause:** VLC is using the wrong RTSP module.
+
+**Solution:** Force the live555 demuxer:
+```bash
+vlc --demux=live555 rtsp://[YOUR_DOMAIN]:8554/live/streamname
+```
+
+Or use ffplay instead:
+```bash
+ffplay -rtsp_transport tcp rtsp://[YOUR_DOMAIN]:8554/live/streamname
+```
+
+### Issue: Stream not accessible externally
+
+**Check the chain:**
+
+```bash
+# 1. MediaMTX running?
+lxc exec mediamtx -- systemctl status mediamtx
+
+# 2. Port listening in container?
+lxc exec mediamtx -- ss -tulpn | grep 8554
+
+# 3. Test directly to MediaMTX (from haproxy container)
+lxc exec haproxy -- ffprobe rtsp://10.100.100.12:8554/live/streamname
+
+# 4. Test through HAProxy (from VPS host)
+ffprobe -rtsp_transport tcp rtsp://10.100.100.11:8554/live/streamname
+
+# 5. HAProxy backend healthy?
+# Check stats page: http://localhost:8404/haproxy_stats (via SSH tunnel)
+
+# 6. Port forwarding configured?
+lxc config device show haproxy | grep rtsp
+
+# 7. Firewall open?
+sudo ufw status | grep 8554
+```
+
+### Issue: "Connection refused" in ATAK
+
+1. Verify the stream is actively publishing (check MediaMTX logs)
+2. Check the URL format: `rtsp://domain:8554/path/streamname`
+3. If authentication is enabled, format is: `rtsp://user:pass@domain:8554/path/streamname`
+
+### Issue: High latency
+
+MediaMTX is low-latency by default, but check:
+
+```yaml
+# In mediamtx.yml - ensure these aren't set too high
+readBufferCount: 512
+```
+
+For lowest latency, use TCP transport in ATAK video settings.
+
+### Issue: MediaMTX crashes or won't start
+
+```bash
+# Check logs
+lxc exec mediamtx -- journalctl -u mediamtx -n 50
+
+# Common issues:
+# - Port already in use
+# - Invalid YAML syntax in config
+# - Missing source URL for pull streams
+```
+
+---
+
+## Quick Reference
+
+| Item | Value |
+|------|-------|
+| Container IP | 10.100.100.12 |
+| RTSP Port | 8554 |
+| RTMP Port | 1935 |
+| Config File | /opt/mediamtx/mediamtx.yml |
+| Service | systemctl [start\|stop\|status] mediamtx |
+| Logs | journalctl -u mediamtx -f |
+| API | http://localhost:9997/v3/paths/list |
+
+**Stream URL Formats:**
+- TAK ICU publish: `rtsp://[YOUR_DOMAIN]:8554/live/[CALLSIGN]icu`
+- View in ATAK: `rtsp://[YOUR_DOMAIN]:8554/live/[CALLSIGN]icu`
+- View with ffplay: `ffplay -rtsp_transport tcp rtsp://[YOUR_DOMAIN]:8554/path/stream`
+
+---
+
+## Next Steps
+
+- Configure specific camera/drone sources
+- Set up authentication for production use
+- Consider bandwidth limits for multiple streams
+- Explore HLS for web browser viewing
+
+---
+
+## Resources
+
+- **MediaMTX Documentation:** https://github.com/bluenviron/mediamtx
+- **TAK ICU (Android):** Available on Google Play Store
+- **ATAK Video Player:** Built into ATAK under Menu → Video
+- **TAK Video Guide:** https://wiki.tak.gov (requires TAK.gov account)
+
+---
+
+*Last Updated: November 2025*
