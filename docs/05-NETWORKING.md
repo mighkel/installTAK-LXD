@@ -356,6 +356,11 @@ sudo nano /etc/haproxy/haproxy.cfg
 # Test configuration syntax
 sudo haproxy -c -f /etc/haproxy/haproxy.cfg
 
+# You may see this error.  It's ok.
+# [WARNING]  (1059) : parsing [/etc/haproxy/haproxy.cfg:84] : a 'redirect' rule placed after a 'use_backend' rule will still be processed before.
+# Warnings were found.
+# Configuration file is valid
+
 # If valid, restart HAProxy
 sudo systemctl restart haproxy
 sudo systemctl status haproxy
