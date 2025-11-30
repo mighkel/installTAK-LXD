@@ -393,7 +393,7 @@ If you see "satip stream error", VLC is using the wrong module. The `--demux=liv
 
 ### 6.3 Test with TAK ICU (Android)
 
-TAK ICU is an Android app that streams video from your phone's camera to an RTSP server.
+TAK ICU is an Android app that streams video, including KLV data, from your phone's camera to an RTSP server.
 
 1. Install **TAK ICU** from Play Store
 2. Open TAK ICU
@@ -405,14 +405,17 @@ TAK ICU is an Android app that streams video from your phone's camera to an RTSP
 > 💡 **Stream Path:** TAK ICU publishes to whatever path you specify. The `live/` prefix is a convention but not required. MediaMTX accepts any path by default.
 
 ### 6.4 View Stream in ATAK
+Method 1
+1. Open ATAK
+2. In the map, find the COT markers for the stream.  
+   There will likely be two markers: The sending unit's POI marker, and a corresponding feed marker that looks like a camera.
+3. Select the feed marker to pull up the radial menu.
+4. In the radial menu, select the video icon at the top to view the stream.
 
+Method 2
 1. Open ATAK
 2. Tap Menu (three lines) → Video
-3. Tap + to add new video alias
-4. Configure:
-   - **Alias:** TAK ICU Feed (or any name)
-   - **URL:** `rtsp://[YOUR_DOMAIN]:8554/live/[CALLSIGN]icu`
-5. Tap the video entry to view
+3. Tap the video entry to view
 
 > ⚠️ **Same Device Limitation:** If streaming from TAK ICU and viewing in ATAK on the same device, the video may freeze intermittently due to resource contention. Use separate devices for reliable viewing.
 
@@ -422,7 +425,7 @@ TAK ICU is an Android app that streams video from your phone's camera to an RTSP
 
 ### 7.1 IP Cameras
 
-Most IP cameras output RTSP. Configure MediaMTX to pull from the camera:
+Most IP cameras output RTSP, but may not provide KLV data. Configure MediaMTX to pull from the camera:
 
 📦 **Inside MediaMTX Container**
 
@@ -448,6 +451,8 @@ DJI drones typically use RTMP. Push from the controller/app to MediaMTX:
 **RTMP URL:** `rtmp://[YOUR_VPS_IP]:1935/drone1`
 
 The stream will be available as RTSP at: `rtsp://[YOUR_VPS_IP]:8554/drone1`
+
+UASTool plugin generally handles the feed similar to TAK ICU.
 
 ### 7.3 OBS Studio
 
