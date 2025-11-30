@@ -584,7 +584,7 @@ hostname
 ### 8.2 Copy Enrollment Package to Host
 
 ```bash
-lxc file pull tak/home/takadmin/enrollmentDP.zip ~/enrollmentDP.zip
+lxc file pull tak/home/takadmin/enrollmentDP.zip ~/
 
 # Verify
 ls -lh ~/enrollmentDP.zip
@@ -594,7 +594,7 @@ ls -lh ~/enrollmentDP.zip
 
 ```bash
 # Copy webadmin.p12 to host
-lxc file pull tak/home/takadmin/webadmin.p12 ~/webadmin.p12
+lxc file pull tak/opt/tak/certs/files/webadmin.p12 ~/
 
 # This certificate is needed to access TAK Server web UI
 ```
