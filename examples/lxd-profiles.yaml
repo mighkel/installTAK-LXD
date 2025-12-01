@@ -8,7 +8,7 @@
 # USAGE:
 #   1. Create the takbr0 network first (see Phase 1 documentation)
 #   2. Create this profile: lxc profile create tak-profile
-#   3. Edit the profile: lxc profile edit tak-profile < lxd-profile.yaml
+#   3. Edit the profile: lxc profile edit tak-profile < lxd-profiles.yaml
 #   4. Apply to containers: lxc profile add tak tak-profile
 #
 # NOTE: This profile provides defaults. Container-specific settings
@@ -45,30 +45,64 @@ devices:
 name: tak-profile
 
 # ============================================================
-# CONTAINER-SPECIFIC CONFIGURATIONS
+# CONTAINER CREATION WITH STATIC IPs
 # ============================================================
 #
-# When launching containers, apply static IPs like this:
+# When launching containers, assign static IPs using this pattern:
 #
-# TAK Server Container:
-#   lxc launch ubuntu:22.04 tak --profile tak-profile
+#   1. Launch with network flag
+#   2. Wait for startup
+#   3. Stop container
+#   4. Set static IP
+#   5. Start container
+#
+# This stop/start cycle is required because the network device
+# is created at launch time, and IP changes require restart.
+#
+# ------------------------------------------------------------
+# TAK Server Container (10.100.100.10):
+# ------------------------------------------------------------
+#   lxc launch ubuntu:22.04 tak --network takbr0
+#   sleep 5
+#   lxc stop tak
 #   lxc config device set tak eth0 ipv4.address=10.100.100.10
+#   lxc start tak
 #
-# HAProxy Container:
-#   lxc launch ubuntu:22.04 haproxy --profile tak-profile
+# ------------------------------------------------------------
+# HAProxy Container (10.100.100.11):
+# ------------------------------------------------------------
+#   lxc launch ubuntu:22.04 haproxy --network takbr0
+#   sleep 5
+#   lxc stop haproxy
 #   lxc config device set haproxy eth0 ipv4.address=10.100.100.11
+#   lxc start haproxy
 #
-# MediaMTX Container (optional):
-#   lxc launch ubuntu:22.04 mediamtx --profile tak-profile
+# ------------------------------------------------------------
+# MediaMTX Container (10.100.100.12) - Optional:
+# ------------------------------------------------------------
+#   lxc launch ubuntu:22.04 mediamtx --network takbr0
+#   sleep 5
+#   lxc stop mediamtx
 #   lxc config device set mediamtx eth0 ipv4.address=10.100.100.12
+#   lxc start mediamtx
 #
-# NextCloud Container (optional):
-#   lxc launch ubuntu:22.04 nextcloud --profile tak-profile
+# ------------------------------------------------------------
+# NextCloud Container (10.100.100.13) - Optional:
+# ------------------------------------------------------------
+#   lxc launch ubuntu:22.04 nextcloud --network takbr0
+#   sleep 5
+#   lxc stop nextcloud
 #   lxc config device set nextcloud eth0 ipv4.address=10.100.100.13
+#   lxc start nextcloud
 #
-# Node-RED Container (optional):
-#   lxc launch ubuntu:22.04 nodered --profile tak-profile
+# ------------------------------------------------------------
+# Node-RED Container (10.100.100.14) - Optional:
+# ------------------------------------------------------------
+#   lxc launch ubuntu:22.04 nodered --network takbr0
+#   sleep 5
+#   lxc stop nodered
 #   lxc config device set nodered eth0 ipv4.address=10.100.100.14
+#   lxc start nodered
 #
 # ============================================================
 
@@ -92,3 +126,20 @@ name: tak-profile
 #
 # ============================================================
 
+
+# ============================================================
+# CONTAINER IP ASSIGNMENTS SUMMARY
+# ============================================================
+#
+# Container     IP Address        Purpose
+# ---------     ----------        -------
+# tak           10.100.100.10     TAK Server
+# haproxy       10.100.100.11     Reverse Proxy / Load Balancer
+# mediamtx      10.100.100.12     RTSP Video Streaming (optional)
+# nextcloud     10.100.100.13     File Sharing (optional)
+# nodered       10.100.100.14     Automation & Integration (optional)
+#
+# Reserved:     10.100.100.15-99  Future static assignments
+# DHCP Pool:    10.100.100.100-199  Auto-assigned (test containers, etc.)
+#
+# ============================================================
