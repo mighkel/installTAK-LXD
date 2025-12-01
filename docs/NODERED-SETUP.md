@@ -143,7 +143,17 @@ v20.x.x
 10.x.x
 ```
 
-### 2.4 Install Node-RED
+### 2.4 Update npm (Optional)
+
+```bash
+# Check for newer npm version
+npm install -g npm@latest
+
+# Verify
+npm --version
+```
+
+### 2.5 Install Node-RED
 
 ```bash
 # Install Node-RED globally
@@ -228,6 +238,10 @@ uiHost: "0.0.0.0",
 // Default port
 uiPort: process.env.PORT || 1880,
 
+// Set a credential secret to encrypt stored credentials
+// Generate with: openssl rand -hex 24
+credentialSecret: "your-random-secret-here",
+
 // Enable projects feature (optional but useful)
 editorTheme: {
     projects: {
@@ -235,6 +249,13 @@ editorTheme: {
     }
 },
 ```
+
+> ⚠️ **IMPORTANT:** Set `credentialSecret` to a random string. This encrypts any credentials stored in flows. Without it, Node-RED uses a system-generated key that will be lost if you reinstall, making credentials unrecoverable.
+>
+> Generate a secure secret:
+> ```bash
+> openssl rand -hex 24
+> ```
 
 > ⚠️ **Security Note:** We'll configure authentication in Step 7. For now, Node-RED is only accessible within the LXD network.
 
@@ -308,6 +329,8 @@ npm install node-red-contrib-web-worldmap
 # Exit nodered user
 exit
 ```
+
+> ⚠️ **npm Audit Warnings:** You will see deprecation warnings and vulnerability reports during installation. These are upstream issues in node-red-contrib-tak's dependencies and cannot be fixed by changing packages. The practical security comes from your network architecture (container isolation, SSH tunnel access, authentication). Do NOT run `npm audit fix --force` as it may downgrade to older, less functional versions.
 
 ### 4.2 Install Additional Useful Nodes
 
@@ -421,31 +444,107 @@ sudo ufw allow 1880/tcp comment 'Node-RED'
 
 🖥️ **VPS Host**
 
-Node-RED needs certificates to connect to TAK Server via TLS.
+Node-RED needs certificates to connect to TAK Server via TLS. Choose one of the following options:
+
+---
+
+**Option A: Use webadmin certificates (Quick)**
+
+Best for single-admin setups where one person manages both Node-RED and TAK web administration.
 
 ```bash
 # Create certs directory in Node-RED container
 lxc exec nodered -- mkdir -p /home/nodered/.node-red/certs
 
-# Copy certificates from TAK container
-lxc file pull tak/opt/tak/certs/files/admin.pem /tmp/admin.pem
-lxc file pull tak/opt/tak/certs/files/admin-key.pem /tmp/admin-key.pem
+# Copy webadmin certificates from TAK container
+lxc file pull tak/opt/tak/certs/files/webadmin.pem /tmp/client.pem
+lxc file pull tak/opt/tak/certs/files/webadmin.key /tmp/client-key.pem
 lxc file pull tak/opt/tak/certs/files/ca.pem /tmp/ca.pem
 
 # Push to Node-RED container
-lxc file push /tmp/admin.pem nodered/home/nodered/.node-red/certs/
-lxc file push /tmp/admin-key.pem nodered/home/nodered/.node-red/certs/
+lxc file push /tmp/client.pem nodered/home/nodered/.node-red/certs/
+lxc file push /tmp/client-key.pem nodered/home/nodered/.node-red/certs/
 lxc file push /tmp/ca.pem nodered/home/nodered/.node-red/certs/
 
-# Set permissions
-lxc exec nodered -- chown -R nodered:nodered /home/nodered/.node-red/certs
-lxc exec nodered -- chmod 600 /home/nodered/.node-red/certs/*.pem
-
-# Clean up temp files
-rm /tmp/admin.pem /tmp/admin-key.pem /tmp/ca.pem
+# Clean up
+rm /tmp/client.pem /tmp/client-key.pem /tmp/ca.pem
 ```
 
-### 6.2 Configure TLS in Node-RED
+---
+
+**Option B: Create dedicated Node-RED certificate (Recommended)**
+
+Best for teams or production deployments - allows independent revocation without affecting other access.
+
+```bash
+# Enter TAK container
+lxc exec tak -- bash
+
+# Navigate to certs directory
+cd /opt/tak/certs
+
+# Create a certificate for Node-RED
+./makeCert.sh client nodered
+
+# Exit container
+exit
+
+# Create certs directory in Node-RED container
+lxc exec nodered -- mkdir -p /home/nodered/.node-red/certs
+
+# Copy the new certs
+lxc file pull tak/opt/tak/certs/files/nodered.pem /tmp/client.pem
+lxc file pull tak/opt/tak/certs/files/nodered.key /tmp/client-key.pem
+lxc file pull tak/opt/tak/certs/files/ca.pem /tmp/ca.pem
+
+# Push to Node-RED container
+lxc file push /tmp/client.pem nodered/home/nodered/.node-red/certs/
+lxc file push /tmp/client-key.pem nodered/home/nodered/.node-red/certs/
+lxc file push /tmp/ca.pem nodered/home/nodered/.node-red/certs/
+
+# Clean up
+rm /tmp/client.pem /tmp/client-key.pem /tmp/ca.pem
+```
+
+---
+
+### 6.2 Decrypt Private Key
+
+TAK certificates are password-protected. Node-RED's TLS config works best with decrypted keys.
+
+📦 **Inside Node-RED Container**
+
+🖥️ **VPS Host**
+
+```bash
+lxc exec nodered -- bash
+```
+
+📦 **Inside Node-RED Container**
+
+```bash
+cd /home/nodered/.node-red/certs
+
+# Decrypt the key (enter your TAK certificate password when prompted)
+openssl rsa -in client-key.pem -out client-key-decrypted.pem
+
+# Set ownership and permissions
+chown nodered:nodered client-key-decrypted.pem
+chmod 600 client-key-decrypted.pem
+
+# Set permissions on all cert files
+chown -R nodered:nodered /home/nodered/.node-red/certs
+chmod 600 /home/nodered/.node-red/certs/*.pem
+
+exit
+```
+
+> 💡 **TIP:** If you don't remember your certificate password, check:
+> ```bash
+> lxc exec tak -- cat /opt/tak/certs/cert-metadata.sh | grep PASS
+> ```
+
+### 6.3 Configure TLS in Node-RED
 
 Access Node-RED editor (via SSH tunnel or direct):
 
@@ -454,7 +553,7 @@ Access Node-RED editor (via SSH tunnel or direct):
 3. Verify TAK nodes are installed (should show `node-red-contrib-tak`)
 4. Close palette manager
 
-### 6.3 Create Basic TAK Connection Flow
+### 6.4 Create Basic TAK Connection Flow
 
 In the Node-RED editor:
 
@@ -506,8 +605,8 @@ In the Node-RED editor:
         "id": "tak-tls-config",
         "type": "tls-config",
         "name": "TAK TLS",
-        "cert": "/home/nodered/.node-red/certs/admin.pem",
-        "key": "/home/nodered/.node-red/certs/admin-key.pem",
+        "cert": "/home/nodered/.node-red/certs/client.pem",
+        "key": "/home/nodered/.node-red/certs/client-key-decrypted.pem",
         "ca": "/home/nodered/.node-red/certs/ca.pem",
         "certname": "",
         "keyname": "",
@@ -522,7 +621,7 @@ In the Node-RED editor:
 3. Click **Import**
 4. Click **Deploy**
 
-### 6.4 Verify Connection
+### 6.5 Verify Connection
 
 1. Open the **Debug** sidebar (bug icon on right)
 2. When TAK clients send position updates, you should see CoT events appear
@@ -795,6 +894,23 @@ lxc exec nodered -- journalctl -u node-red -n 50
    ```bash
    lxc exec nodered -- openssl s_client -connect 10.100.100.10:8089
    ```
+
+### Issue: "ERR_OSSL_BAD_DECRYPT" error
+
+**Cause:** The private key is password-protected and Node-RED can't decrypt it.
+
+**Solution:** Decrypt the key file:
+
+```bash
+lxc exec nodered -- bash
+cd /home/nodered/.node-red/certs
+openssl rsa -in client-key.pem -out client-key-decrypted.pem
+chown nodered:nodered client-key-decrypted.pem
+chmod 600 client-key-decrypted.pem
+exit
+```
+
+Then update the TLS config node to use `client-key-decrypted.pem` and leave the passphrase field empty.
 
 ### Issue: No CoT events appearing
 
