@@ -146,7 +146,6 @@ grep -i "postgres\|database" /opt/tak/logs/takserver-messaging.log | tail -20
 - `CCFIRE780` - Clear Creek Fire, Unit 780, ATAK
 - `CCFIRE780-wt` - Same user, WinTAK
 - `BCSO2240` - Boise County Sheriff's Office, Unit 2240
-- `IDACOM123-it` - Idaho Communications, ID 123, iTAK
 
 **Device Suffixes:**
 - *(none)* - ATAK (default/primary)
