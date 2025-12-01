@@ -66,6 +66,10 @@ name: tak-profile
 #   lxc launch ubuntu:22.04 nextcloud --profile tak-profile
 #   lxc config device set nextcloud eth0 ipv4.address=10.100.100.13
 #
+# Node-RED Container (optional):
+#   lxc launch ubuntu:22.04 nodered --profile tak-profile
+#   lxc config device set nodered eth0 ipv4.address=10.100.100.14
+#
 # ============================================================
 
 
@@ -87,3 +91,4 @@ name: tak-profile
 #   lxc network list
 #
 # ============================================================
+
