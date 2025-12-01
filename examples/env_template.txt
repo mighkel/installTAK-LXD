@@ -82,6 +82,7 @@ HAPROXY_CONTAINER_IP="10.100.100.11"
 # Optional service container IPs (uncomment if using)
 # MEDIAMTX_CONTAINER_IP="10.100.100.12"
 # NEXTCLOUD_CONTAINER_IP="10.100.100.13"
+# NODERED_CONTAINER_IP="10.100.100.14"
 
 
 # ============================================================
@@ -94,7 +95,7 @@ HAPROXY_CONTAINER_IP="10.100.100.11"
 # ------------------------------------------------------------
 
 # Your organization's full name
-# Example: Mountain Search and Rescue
+# Example: MSAR, BFPD, BBVFD
 YOUR_ORG=""
 
 # Certificate Authority name prefix (short, no spaces)
@@ -189,6 +190,9 @@ ENABLE_MEDIAMTX="no"
 # NextCloud - File sharing
 ENABLE_NEXTCLOUD="no"
 
+# Node-RED - Integration
+ENABLE_NODERED="no"
+
 
 # ============================================================
 # SECTION 7: DNS RECORDS CHECKLIST
@@ -203,6 +207,7 @@ ENABLE_NEXTCLOUD="no"
 # Optional (if using):
 #   files.[YOUR_BASE_DOMAIN] → [YOUR_VPS_IP]  (NextCloud)
 #   rtsp.[YOUR_BASE_DOMAIN] → [YOUR_VPS_IP]   (MediaMTX)
+#   nr.[YOUR_BASE_DOMAIN] → [YOUR_VPS_IP]   (Node-RED)
 #
 # Verify: dig tak.[YOUR_BASE_DOMAIN] +short
 # ============================================================
@@ -221,6 +226,7 @@ ENABLE_NEXTCLOUD="no"
 #
 # Optional:
 #   443  - HTTPS (web services)
+#   1880 - Node-RED API (Node-RED)
 #   8554 - RTSP (MediaMTX)
 #   8404 - HAProxy stats (SSH tunnel only)
 # ============================================================
@@ -280,7 +286,7 @@ TAK_POLICY_FILENAME="deb_policy.pol"
 #
 # Resources:
 #   GitHub: https://github.com/mighkel/installTAK-LXD
-#   TAK Syndicate: https://www.thetaksyndicate.org/
 #
 # ============================================================
+
 
