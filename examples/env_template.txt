@@ -184,6 +184,38 @@ HAPROXY_CONTAINER_NAME="haproxy"
 
 
 # ============================================================
+# SECTION 5B: GOOGLE DRIVE FILE IDs (OPTIONAL)
+# Used in: Phase 2 (if using gdown for automated download)
+# ============================================================
+#
+# If you have TAK server files hosted on Google Drive, you can
+# use gdown to download them directly to the container.
+#
+# To get the file ID from a Google Drive share link:
+#   https://drive.google.com/file/d/[FILE_ID_IS_HERE]/view?usp=sharing
+#                                    ^^^^^^^^^^^^^^^^^
+#                                    Copy this part
+#
+# Usage in container:
+#   gdown [FILE_ID] -O [FILENAME]
+#
+# Example:
+#   gdown 1a2b3c4d5e6f7g8h9i0j -O takserver-5.5-RELEASE58_all.deb
+#
+# Leave empty if manually transferring files via scp/lxc file push
+# ------------------------------------------------------------
+
+# Google Drive file ID for TAK Server .deb package
+# GDRIVE_TAK_DEB_ID=""
+
+# Google Drive file ID for TAK Server GPG public key
+# GDRIVE_TAK_GPG_ID=""
+
+# Google Drive file ID for TAK Server Debian policy file
+# GDRIVE_TAK_POLICY_ID=""
+
+
+# ============================================================
 # SECTION 6: OPTIONAL SERVICES
 # Used in: Supplemental Guides (S1-MediaMTX, S2-Node-RED)
 # ============================================================
@@ -314,3 +346,4 @@ TAK_POLICY_FILENAME="deb_policy.pol"
 #   GitHub: https://github.com/mighkel/installTAK-LXD
 #
 # ============================================================
+
