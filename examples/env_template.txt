@@ -53,7 +53,7 @@ YOUR_TIMEZONE=""
 
 # ============================================================
 # SECTION 2: CONTAINER NETWORK (Option B - Static IPs)
-# Used in: Phase 1, Phase 2, Phase 5
+# Used in: Phase 1, Phase 2, Phase 5, Supplemental Guides
 # ============================================================
 #
 # This deployment uses a dedicated LXD bridge network (takbr0)
@@ -71,11 +71,11 @@ YOUR_TIMEZONE=""
 # LXD Bridge name
 LXD_BRIDGE_NAME="takbr0"
 
-# Bridge gateway IP (host side of bridge)
+# Bridge subnet and gateway IP (host side of bridge)
 LXD_BRIDGE_SUBNET="10.100.100.0/24"
 LXD_BRIDGE_IP="10.100.100.1"
 
-# Container static IPs
+# Container static IPs (core services)
 TAK_CONTAINER_IP="10.100.100.10"
 HAPROXY_CONTAINER_IP="10.100.100.11"
 
@@ -95,50 +95,53 @@ HAPROXY_CONTAINER_IP="10.100.100.11"
 # ------------------------------------------------------------
 
 # Your organization's full name
-# Example: MSAR, BFPD, BBVFD
+# Example: Mountain Search and Rescue, Boise Fire Protection District
 YOUR_ORG=""
 
-# Certificate Authority name prefix (short, no spaces)
-# Becomes part of root CA name: [YOUR_CA_NAME]-ROOT-CA
-# Example: MSAR, YOURORG
+# Root Certificate Authority name (short, no spaces)
+# Prompt: "Enter a name for the Root CA:"
+# Example: MSAR, BFPD, YOURORG
 YOUR_CA_NAME=""
 
-# Intermediate Certificate Authority name prefix (short, no spaces)
-# Becomes part of Intermediate CA name: [YOUR_INT_CA_NAME]-INTERMEDIATE-CA
-# Example: MSARINT, YOURORGINT
+# Intermediate Certificate Authority name (short, no spaces)
+# Prompt: "Enter a name for the Intermediate CA:"
+# Example: MSAR-INT, BFPD-INT, YOURORG-INT
 YOUR_INT_CA_NAME=""
 
 # State or Province (full name)
-# Example: Colorado, California
+# Example: Colorado, California, Idaho
 YOUR_STATE=""
 
 # City
-# Example: Denver, Los Angeles
+# Example: Denver, Los Angeles, Boise
 YOUR_CITY=""
 
-# Organizational Unit (optional, use "NA" if none)
+# Organizational Unit (optional, can leave empty or use "NA")
 # Example: Communications, IT, Operations
 YOUR_UNIT=""
 
-# TAK Server Name in Data Package for EUDs
-# Example: Mtn SAR TAK Server
+# TAK Server description for Data Packages
+# Prompt: "Enter a short description of this TAK Server connection"
+# This is displayed on TAK clients when connecting
+# Example: Mountain SAR TAK, Boise FD TAK, My Team TAK
 TAK_SERVER_NAME=""
+
 
 # ============================================================
 # SECTION 4: CREDENTIALS & PASSWORDS
-# Used in: Phase 3, Phase 4, Phase 5
+# Used in: Phase 3, Phase 4, Phase 5, Supplemental Guides
 # ============================================================
 #
-# ⚠️  IMPORTANT: Set strong passwords - no defaults!
-# ⚠️  Store this file securely - it contains secrets!
+# WARNING: Set strong passwords - no defaults!
+# WARNING: Store this file securely - it contains secrets!
 # ------------------------------------------------------------
 
 # Certificate password (for ALL .p12 and .jks files)
-# Minimum 8 characters, use special characters
-# ⛔ DO NOT use default 'atakatak' - widely known!
+# Minimum 8 characters, recommend using special characters
+# DO NOT use default 'atakatak' - it is widely known!
 CERT_PASSWORD=""
 
-# HAProxy statistics page password
+# HAProxy statistics page credentials
 # Access via SSH tunnel: http://localhost:8404/haproxy_stats
 HAPROXY_STATS_USER="admin"
 HAPROXY_STATS_PASSWORD=""
@@ -147,13 +150,18 @@ HAPROXY_STATS_PASSWORD=""
 # Receives certificate expiry warnings (90-day certs)
 YOUR_EMAIL=""
 
+# Node-RED credential secret (if using Node-RED)
+# Encrypts stored credentials in flows
+# Generate with: openssl rand -hex 24
+NODERED_CREDENTIAL_SECRET=""
+
 
 # ============================================================
 # SECTION 5: TAK SERVER FILES
 # Used in: Phase 2, Phase 3
 # ============================================================
 #
-# ⛔ READ CAREFULLY - Common source of errors!
+# !!! READ CAREFULLY - Common source of errors !!!
 #
 # The TAK Server filename uses BOTH hyphens AND underscores:
 #   takserver-5.5-RELEASE##_all.deb
@@ -170,27 +178,28 @@ YOUR_EMAIL=""
 # TAK Server .deb filename (EXACT as downloaded)
 TAK_DEB_FILENAME=""
 
-# Container names
+# Container names (defaults work for most deployments)
 TAK_CONTAINER_NAME="tak"
 HAPROXY_CONTAINER_NAME="haproxy"
 
 
 # ============================================================
 # SECTION 6: OPTIONAL SERVICES
-# Used in: Phase 5 (Networking)
+# Used in: Supplemental Guides (S1-MediaMTX, S2-Node-RED)
 # ============================================================
 
-# Let's Encrypt SSL certificates (recommended)
+# Let's Encrypt SSL certificates (recommended for production)
 ENABLE_LETSENCRYPT="yes"
 
-# MediaMTX - RTSP video streaming
-# For drone feeds, surveillance cameras, etc.
+# MediaMTX - RTSP video streaming (TAK ICU, drones, IP cameras)
+# See: S1-MEDIAMTX-SETUP.md
 ENABLE_MEDIAMTX="no"
 
-# NextCloud - File sharing
+# NextCloud - File sharing and collaboration
 ENABLE_NEXTCLOUD="no"
 
-# Node-RED - Integration
+# Node-RED - Automation and data integration
+# See: S2-NODERED-SETUP.md
 ENABLE_NODERED="no"
 
 
@@ -202,14 +211,16 @@ ENABLE_NODERED="no"
 # All records point to: YOUR_VPS_IP
 #
 # Required:
-#   tak.[YOUR_BASE_DOMAIN] → [YOUR_VPS_IP]
+#   tak.[YOUR_BASE_DOMAIN]    -> [YOUR_VPS_IP]
 #
-# Optional (if using):
-#   files.[YOUR_BASE_DOMAIN] → [YOUR_VPS_IP]  (NextCloud)
-#   rtsp.[YOUR_BASE_DOMAIN] → [YOUR_VPS_IP]   (MediaMTX)
-#   nr.[YOUR_BASE_DOMAIN] → [YOUR_VPS_IP]   (Node-RED)
+# Optional (create if using these services):
+#   files.[YOUR_BASE_DOMAIN]  -> [YOUR_VPS_IP]  (NextCloud)
+#   rtsp.[YOUR_BASE_DOMAIN]   -> [YOUR_VPS_IP]  (MediaMTX)
+#   nodered.[YOUR_BASE_DOMAIN] -> [YOUR_VPS_IP] (Node-RED, if exposed)
 #
-# Verify: dig tak.[YOUR_BASE_DOMAIN] +short
+# Verify DNS propagation:
+#   dig tak.[YOUR_BASE_DOMAIN] +short
+#   nslookup tak.[YOUR_BASE_DOMAIN]
 # ============================================================
 
 
@@ -218,26 +229,34 @@ ENABLE_NODERED="no"
 # ============================================================
 #
 # Required ports (open in VPS firewall):
-#   22   - SSH
-#   80   - HTTP (ACME/Let's Encrypt)
-#   8089 - TAK client connections
-#   8443 - TAK Web UI
+#   22   - SSH (remote administration)
+#   80   - HTTP (ACME/Let's Encrypt challenges)
+#   8089 - TAK client connections (streaming)
+#   8443 - TAK Web UI (administration)
 #   8446 - TAK certificate enrollment
 #
-# Optional:
-#   443  - HTTPS (web services)
-#   1880 - Node-RED API (Node-RED)
-#   8554 - RTSP (MediaMTX)
-#   8404 - HAProxy stats (SSH tunnel only)
+# Optional ports (open only if using these services):
+#   443  - HTTPS (NextCloud, other web services)
+#   1880 - Node-RED editor (recommend SSH tunnel instead)
+#   8554 - RTSP video streaming (MediaMTX)
+#   8404 - HAProxy stats (SSH tunnel only - never expose!)
+#
 # ============================================================
 
 
 # ============================================================
 # SECTION 9: COMPUTED VALUES (DO NOT EDIT)
+# These are derived from values above for use in scripts
 # ============================================================
 
-FULL_CA_NAME="${YOUR_CA_NAME}-ROOT-CA"
-LE_KEYSTORE_FILENAME="${TAK_CONTAINER_NAME}-le.jks"
+# Full CA names as they appear in certificates
+FULL_ROOT_CA_NAME="${YOUR_CA_NAME}"
+FULL_INT_CA_NAME="${YOUR_INT_CA_NAME}"
+
+# Let's Encrypt keystore filename
+LE_KEYSTORE_FILENAME="${YOUR_VPS_HOSTNAME}-le.jks"
+
+# TAK repository files
 TAK_GPG_KEY_FILENAME="takserver-public-gpg.key"
 TAK_POLICY_FILENAME="deb_policy.pol"
 
@@ -247,7 +266,7 @@ TAK_POLICY_FILENAME="deb_policy.pol"
 # ============================================================
 #
 # PHASE 1: LXD Setup
-#   YOUR_VPS_IP, YOUR_VPS_HOSTNAME
+#   YOUR_VPS_IP, YOUR_VPS_HOSTNAME, YOUR_TIMEZONE
 #   LXD_BRIDGE_NAME, LXD_BRIDGE_SUBNET, LXD_BRIDGE_IP
 #
 # PHASE 2: Container Setup
@@ -255,14 +274,14 @@ TAK_POLICY_FILENAME="deb_policy.pol"
 #   YOUR_TIMEZONE, TAK_DEB_FILENAME
 #
 # PHASE 3: TAK Installation
-#   YOUR_DOMAIN, YOUR_ORG, YOUR_CA_NAME
+#   YOUR_DOMAIN, YOUR_ORG, YOUR_CA_NAME, YOUR_INT_CA_NAME
 #   YOUR_STATE, YOUR_CITY, YOUR_UNIT
-#   CERT_PASSWORD, TAK_DEB_FILENAME
+#   CERT_PASSWORD, TAK_DEB_FILENAME, TAK_SERVER_NAME
 #
 # PHASE 4: Certificate Management
-#   YOUR_CA_NAME, CERT_PASSWORD
+#   YOUR_CA_NAME, YOUR_INT_CA_NAME, CERT_PASSWORD
 #
-# PHASE 5: Networking
+# PHASE 5: Networking (HAProxy & Let's Encrypt)
 #   YOUR_DOMAIN, YOUR_VPS_IP, YOUR_EMAIL
 #   TAK_CONTAINER_IP, HAPROXY_CONTAINER_IP
 #   HAPROXY_STATS_USER, HAPROXY_STATS_PASSWORD
@@ -270,6 +289,13 @@ TAK_POLICY_FILENAME="deb_policy.pol"
 #
 # PHASE 6: Verification
 #   YOUR_DOMAIN, CERT_PASSWORD
+#
+# SUPPLEMENTAL - MediaMTX (S1):
+#   MEDIAMTX_CONTAINER_IP, YOUR_DOMAIN
+#
+# SUPPLEMENTAL - Node-RED (S2):
+#   NODERED_CONTAINER_IP, NODERED_CREDENTIAL_SECRET
+#   CERT_PASSWORD (for TAK certificate decryption)
 #
 # ============================================================
 
@@ -280,13 +306,11 @@ TAK_POLICY_FILENAME="deb_policy.pol"
 #
 # NEXT STEPS:
 # 1. Verify all required fields are filled in
-# 2. Save this file securely
+# 2. Save this file securely (it contains passwords!)
 # 3. Create DNS records (Section 7)
 # 4. Begin with Phase 1: LXD Setup
 #
-# Resources:
+# Documentation:
 #   GitHub: https://github.com/mighkel/installTAK-LXD
 #
 # ============================================================
-
-
