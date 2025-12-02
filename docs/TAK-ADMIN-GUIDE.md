@@ -10,6 +10,61 @@ This guide covers day-to-day operations, user management, troubleshooting, and b
 
 ---
 
+## Customization Reference
+
+This template uses placeholder values that should be replaced with your organization's specific information. Use find-and-replace to customize this document for your agency.
+
+### Required Placeholders
+
+| Placeholder | Description | Example |
+|-------------|-------------|---------|
+| `[YOUR_DOMAIN]` | Your TAK server's FQDN | `tak.example.org` |
+| `[YOUR_ORG]` | Organization abbreviation | `MVFD`, `BCSO`, `SAR1` |
+| `[YOUR_ORG_FULL]` | Full organization name | `Mountain View Fire Department` |
+| `[YOUR_PREFIX]` | Callsign prefix for users | `MVFIRE`, `BCSO`, `SAR` |
+| `[YOUR_UNIT_RANGE]` | Unit number range | `750-779`, `2200-2299` |
+| `[PARTNER_ORG]` | Primary partner agency abbrev | `GCSO`, `STATEFD` |
+| `[PARTNER_PREFIX]` | Partner callsign prefix | `GCSO`, `STFIRE` |
+| `[PARTNER_ORG_FULL]` | Partner full name | `Grant County Sheriff's Office` |
+| `[MUTUAL_AID_ORG]` | Mutual aid agency abbrev | `WRFD`, `FEDRES` |
+| `[MUTUAL_AID_PREFIX]` | Mutual aid callsign prefix | `WRFIRE`, `FEMA` |
+| `[YOUR_AREA_CODE]` | Local area code | `208`, `303`, `406` |
+| `[CERT_PASSWORD]` | Your certificate password | (don't put actual password here) |
+
+### Optional Placeholders
+
+| Placeholder | Description | Example |
+|-------------|-------------|---------|
+| `[ADMIN_EMAIL]` | TAK admin contact email | `takadmin@example.org` |
+| `[IT_CONTACT]` | IT department contact | `helpdesk@example.org` |
+| `[VPS_IP]` | Your VPS IP address | `203.0.113.50` |
+
+### Quick Find-Replace Commands
+
+```bash
+# In VS Code, Sublime, or similar editors:
+# Ctrl+H (or Cmd+H on Mac) then replace each placeholder:
+
+[YOUR_DOMAIN]       -> tak.yourdomain.org
+[YOUR_ORG]          -> YOURORG
+[YOUR_ORG_FULL]     -> Your Organization Full Name
+[YOUR_PREFIX]       -> YOURORG
+[YOUR_UNIT_RANGE]   -> 750-779
+[PARTNER_ORG]       -> PARTNERORG
+[PARTNER_PREFIX]    -> PARTNER
+[PARTNER_ORG_FULL]  -> Partner Organization Full Name
+[MUTUAL_AID_ORG]    -> MUTUALAID
+[MUTUAL_AID_PREFIX] -> MUTUAL
+[YOUR_AREA_CODE]    -> 555
+[CERT_PASSWORD]     -> (your actual password)
+[ADMIN_EMAIL]       -> admin@yourdomain.org
+[VPS_IP]            -> your.vps.ip.address
+```
+
+After customization, delete this "Customization Reference" section.
+
+---
+
 ## Table of Contents
 
 1. [Daily Operations](#1-daily-operations)
@@ -54,17 +109,17 @@ lxc exec tak -- free -h
 ```
 
 **Expected Results:**
-- ✅ takserver service: "active (exited)" - normal
-- ✅ 5+ Java processes running
-- ✅ All ports (8089, 8443, 8446, 9001) listening
-- ✅ No critical errors in last 24 hours
-- ✅ Disk usage < 80%
-- ✅ Memory available > 2GB
+- takserver service: "active (exited)" - normal
+- 5+ Java processes running
+- All ports (8089, 8443, 8446, 9001) listening
+- No critical errors in last 24 hours
+- Disk usage < 80%
+- Memory available > 2GB
 
 ### 1.2 Check Connected Users
 
 **Web UI Method:**
-1. Access: https://tak.pinenut.tech:8443
+1. Access: https://[YOUR_DOMAIN]:8443
 2. Login with webadmin.p12
 3. Navigate to "User Manager"
 4. Review active connections
@@ -143,9 +198,9 @@ grep -i "postgres\|database" /opt/tak/logs/takserver-messaging.log | tail -20
 **Standard Format:** `[AGENCY][UNIT][-DEVICE]`
 
 **Examples:**
-- `CCFIRE780` - Clear Creek Fire, Unit 780, ATAK
-- `CCFIRE780-wt` - Same user, WinTAK
-- `BCSO2240` - Boise County Sheriff's Office, Unit 2240
+- `[YOUR_PREFIX]780` - [YOUR_ORG], Unit 780, ATAK
+- `[YOUR_PREFIX]780-wt` - Same user, WinTAK
+- `[PARTNER_PREFIX]2240` - [PARTNER_ORG], Unit 2240
 
 **Device Suffixes:**
 - *(none)* - ATAK (default/primary)
@@ -156,27 +211,29 @@ grep -i "postgres\|database" /opt/tak/logs/takserver-messaging.log | tail -20
 - `-bk` - Backup device
 - `-tr` - Training device
 
-### 2.1.1 Two Methods for User Onboarding
+### 2.1.1 Three Methods for User Onboarding
 
-TAK Server supports two different methods for getting users connected. Understanding the difference is important.
+TAK Server supports three different methods for getting users connected. Understanding the differences is important for choosing the right approach.
 
-#### Method 1: Certificate Enrollment (Recommended for Most Agencies)
+---
+
+#### Method 1: Certificate Enrollment with Data Package (Standard)
 
 **How it works:**
 1. Admin creates user in web UI with username/password
 2. Admin distributes enrollmentDP.zip + credentials to user
 3. User imports DP into ATAK, enters username/password
-4. ATAK requests certificate from server
+4. ATAK requests certificate from server via port 8446
 5. **Server automatically generates certificate** for user
 6. Certificate downloaded and installed in ATAK
 7. User connects (certificate-based from now on)
 
 **Advantages:**
-- ✅ Easy for users (just username/password initially)
-- ✅ Scalable (works great for 10-100+ users)
-- ✅ Self-service (users provision themselves)
-- ✅ No .p12 files to manually distribute
-- ✅ Certificates auto-created by server
+- Works with self-signed certificates (DP contains trust store)
+- No Android system-level certificate installation
+- Self-service (users provision themselves)
+- No .p12 files to manually distribute
+- Certificates auto-created by server
 
 **Requirements:**
 - Port 8446 must be accessible to users
@@ -184,40 +241,111 @@ TAK Server supports two different methods for getting users connected. Understan
 - Enrollment enabled in CoreConfig.xml (default in installTAK)
 
 **When to use:**
+- Self-signed TAK certificates (no Let's Encrypt)
 - Multiple users to onboard
 - Users not technically sophisticated
 - Want self-service provisioning
-- Have reliable network for enrollment
 
 **User receives:**
-- enrollmentDP.zip (or enrollmentDP-QUIC.zip)
-- Username: CCFIRE780
+- enrollmentDP.zip (TCP) or enrollmentDP-QUIC.zip (QUIC transport)
+- Username: [YOUR_PREFIX]780
 - Password: [set in web UI]
-- Server URL: tak.pinenut.tech
+- Server URL: [YOUR_DOMAIN]
+
+**About enrollmentDP-QUIC.zip:**
+
+> **Note:** QUIC (Quick UDP Internet Connections) is a transport protocol, not an enrollment method. The `-QUIC` suffix indicates the data package is configured to use QUIC protocol instead of TCP for the server connection. QUIC can provide better performance on unreliable networks. This is NOT related to ATAK's "Quick Connect" feature (see Method 2 below).
 
 ---
 
-#### Method 2: Pre-Generated Certificates (Manual Distribution)
+#### Method 2: Quick Connect (No Data Package Required)
 
 **How it works:**
-1. Admin creates certificate via CLI: `makeCert.sh client CCFIRE780`
+1. Admin creates user in web UI with username/password
+2. Admin gives user ONLY: server address + username/password
+3. User opens ATAK -> Settings -> Network -> TAK Servers -> Add
+4. User enters server URL, checks "Use Authentication", enters credentials
+5. If using Let's Encrypt: ATAK trusts server automatically
+6. If using self-signed: User must install CA cert in Android first
+7. ATAK connects to port 8446, requests certificate
+8. Certificate downloaded and installed automatically
+
+**Advantages:**
+- No data package distribution needed
+- Simplest for users (just address + credentials)
+- Works great with Let's Encrypt certificates
+- Can use QR codes for even faster enrollment
+
+**Requirements:**
+- **Strongly recommended:** Let's Encrypt SSL certificates on port 8446
+- Without Let's Encrypt: Users must manually install CA certificate in Android
+- Port 8446 accessible to users
+- User authentication configured
+
+**When to use:**
+- TAK Server uses Let's Encrypt certificates
+- Want simplest possible user experience
+- Distributing QR codes for rapid enrollment
+- Can't easily distribute data package files
+
+**User receives:**
+- Server URL: [YOUR_DOMAIN]:8089
+- Username: [YOUR_PREFIX]780
+- Password: [set in web UI]
+- (Optional) QR code containing above
+
+**ATAK Quick Connect Steps:**
+```
+1. Open ATAK
+2. Tap hamburger menu -> Settings
+3. Network -> TAK Servers
+4. Tap menu -> Add
+5. Address: [YOUR_DOMAIN]
+6. Port: 8089
+7. Protocol: SSL
+8. Check "Use Authentication"
+9. Enter Username and Password
+10. Tap OK
+11. Wait for "Registration succeeded" message
+```
+
+**If Using Self-Signed Certificates (No Let's Encrypt):**
+
+Users must install the CA certificate in Android's trust store BEFORE using Quick Connect:
+
+```
+1. Transfer CA certificate (truststore-intermediate.p12 or ca.pem) to device
+2. Android Settings -> Security -> Encryption & Credentials
+3. Install a certificate -> CA certificate
+4. Select the CA file
+5. Now Quick Connect will work
+```
+
+This extra step is why Method 1 (Data Package) is preferred for self-signed deployments.
+
+---
+
+#### Method 3: Pre-Generated Certificates (Manual Distribution)
+
+**How it works:**
+1. Admin creates certificate via CLI: `makeCert.sh client [YOUR_PREFIX]780`
 2. Admin creates matching user in web UI
 3. Admin securely distributes .p12 file to user
 4. User imports .p12 into ATAK
 5. User connects immediately (certificate IS the authentication)
 
 **Advantages:**
-- ✅ Maximum admin control
-- ✅ No passwords to manage
-- ✅ Works without enrollment port (8446)
-- ✅ Good for offline certificate generation
-- ✅ Certificate security fully in admin hands
+- Maximum admin control
+- No passwords to manage after initial setup
+- Works without enrollment port (8446)
+- Good for offline certificate generation
+- Certificate security fully in admin hands
 
 **Disadvantages:**
-- ⚠️ More admin work (create each cert individually)
-- ⚠️ Must securely distribute .p12 files
-- ⚠️ More complex for non-technical users
-- ⚠️ Doesn't scale as well for large groups
+- More admin work (create each cert individually)
+- Must securely distribute .p12 files
+- More complex for non-technical users
+- Doesn't scale as well for large groups
 
 **When to use:**
 - Small number of users (< 10)
@@ -227,59 +355,62 @@ TAK Server supports two different methods for getting users connected. Understan
 - Users are technically sophisticated
 
 **User receives:**
-- CCFIRE780.p12 file
-- Certificate password: atakatak (or your password)
-- Server URL: tak.pinenut.tech
-- CA trust store (from enrollmentDP.zip)
+- [YOUR_PREFIX]780.p12 file
+- Certificate password: [CERT_PASSWORD]
+- Server URL: [YOUR_DOMAIN]
+- CA trust store (if needed)
 
 ---
 
 #### Comparison Chart
 
-| Feature | Certificate Enrollment | Pre-Generated Certificates |
-|---------|----------------------|----------------------------|
-| **Admin creates cert?** | No (auto-generated) | Yes (via makeCert.sh) |
-| **User gets .p12 file?** | No (downloaded automatically) | Yes (manually distributed) |
-| **Username/password?** | Yes (for initial enrollment) | No (cert is authentication) |
-| **Scalability** | High (100+ users easy) | Low (manual work per user) |
-| **Port 8446 needed?** | Yes | No |
-| **User complexity** | Low (just username/password) | Medium (.p12 file management) |
-| **Admin workload** | Low (mostly automatic) | High (manual cert creation) |
-| **Security** | Good | Excellent (more control) |
-| **Best for** | Most agencies | Small groups, high security |
+| Feature | DP Enrollment | Quick Connect | Pre-Generated Certs |
+|---------|---------------|---------------|---------------------|
+| **Data package needed?** | Yes | No | No (.p12 only) |
+| **Admin creates cert?** | No (auto) | No (auto) | Yes (makeCert.sh) |
+| **Username/password?** | Yes | Yes | No (cert is auth) |
+| **Works with self-signed?** | Yes (easy) | Requires CA install | Yes |
+| **Works with Let's Encrypt?** | Yes | Yes (best option) | Yes |
+| **Port 8446 needed?** | Yes | Yes | No |
+| **User complexity** | Medium | Low | Medium |
+| **Admin workload** | Low | Low | High |
+| **Scalability** | High | High | Low |
+| **Best for** | Self-signed certs | Let's Encrypt | Small/secure |
 
 ---
 
-#### Which Method for CCVFD?
+#### Which Method for [YOUR_ORG]?
 
-**If you've been using enrollment successfully, continue with it!**
+**If using Let's Encrypt certificates:** Use Quick Connect (Method 2) for the simplest user experience. Users only need server address and credentials.
 
-Certificate enrollment is the standard approach for most agencies and works well for Clear Creek VFD's size. The sections below will describe both methods, but you can focus on the enrollment workflow (Section 2.2.1).
+**If using self-signed certificates:** Use Data Package Enrollment (Method 1). The data package includes the trust store, so users don't need to manually install CA certificates.
+
+**For special cases (high security, small team, offline):** Use Pre-Generated Certificates (Method 3).
 
 ---
 
 ### 2.2 User Onboarding Workflows
 
-Choose the appropriate workflow based on your agency's needs. Most agencies use enrollment (2.2.1).
+Choose the appropriate workflow based on your agency's needs and certificate type.
 
-#### 2.2.1 Creating User via Certificate Enrollment (Recommended)
+#### 2.2.1 Creating User via Data Package Enrollment (Self-Signed Certs)
 
 This is the standard method where users self-provision using username/password, and TAK Server automatically generates their certificate.
 
 **Step 1: Create User in Web UI**
 ```
-1. Access: https://tak.pinenut.tech:8443
+1. Access: https://[YOUR_DOMAIN]:8443
 2. Login with webadmin.p12
-3. User Manager → "Add User"
+3. User Manager -> "Add User"
 4. Fill in:
-   - Username: CCFIRE780 (following naming convention)
-   - Password: [Create strong password] ← IMPORTANT for enrollment
+   - Username: [YOUR_PREFIX]780 (following naming convention)
+   - Password: [Create strong password] <- IMPORTANT for enrollment
    - First Name: John
    - Last Name: Smith
    - Role: USER (or ADMIN for leadership)
 5. Add to appropriate groups:
    - All Users (everyone)
-   - CCVFD Operations (or appropriate group)
+   - [YOUR_ORG] Operations (or appropriate group)
    - Additional groups as needed
 6. Save
 ```
@@ -287,10 +418,10 @@ This is the standard method where users self-provision using username/password, 
 **Step 2: Distribute Enrollment Package and Credentials**
 
 Give the user:
-- `enrollmentDP.zip` (or `enrollmentDP-QUIC.zip` if using QUIC)
-- Username: `CCFIRE780`
+- `enrollmentDP.zip` (or `enrollmentDP-QUIC.zip` for QUIC transport)
+- Username: `[YOUR_PREFIX]780`
 - Password: `[password you set]`
-- Server URL: `tak.pinenut.tech`
+- Server URL: `[YOUR_DOMAIN]`
 - Installation instructions
 
 **How to get enrollmentDP.zip:**
@@ -299,7 +430,7 @@ Give the user:
 lxc file pull tak/home/takadmin/enrollmentDP.zip ~/
 
 # Download to your local machine
-scp takadmin@your-vps-ip:~/enrollmentDP.zip ./
+scp takadmin@[VPS_IP]:~/enrollmentDP.zip ./
 ```
 
 **Step 3: User Enrollment Process (User does this)**
@@ -308,11 +439,11 @@ scp takadmin@your-vps-ip:~/enrollmentDP.zip ./
 ```
 1. Transfer enrollmentDP.zip to Android device
 2. Open ATAK
-3. Tap hamburger menu (≡) → Settings
-4. Network → Certificate Enrollment
+3. Tap hamburger menu -> Settings
+4. Network -> Certificate Enrollment
 5. Tap "Import Config"
 6. Select enrollmentDP.zip
-7. Enter Username: CCFIRE780
+7. Enter Username: [YOUR_PREFIX]780
 8. Enter Password: [password from Step 1]
 9. Tap "Enroll"
 10. Wait 10-30 seconds
@@ -325,15 +456,15 @@ scp takadmin@your-vps-ip:~/enrollmentDP.zip ./
 - ATAK connects to port 8446 (enrollment port)
 - Sends username/password to TAK Server
 - TAK Server verifies credentials
-- TAK Server runs: `makeCert.sh client CCFIRE780` automatically
+- TAK Server runs: `makeCert.sh client [YOUR_PREFIX]780` automatically
 - Certificate sent to ATAK encrypted
-- ATAK installs CCFIRE780.p12
+- ATAK installs [YOUR_PREFIX]780.p12
 - Connection switches to port 8089 (cert-based auth)
 
 **Step 4: Verify User Connected**
 ```
-1. Web UI → User Manager
-2. Find user: CCFIRE780
+1. Web UI -> User Manager
+2. Find user: [YOUR_PREFIX]780
 3. Status should show "Connected" (green)
 4. Click username to see connection details
 5. Verify user can access expected missions
@@ -342,14 +473,14 @@ scp takadmin@your-vps-ip:~/enrollmentDP.zip ./
 **Step 5: Document in Inventory**
 ```
 Add to certificate inventory spreadsheet:
-- Username: CCFIRE780
+- Username: [YOUR_PREFIX]780
 - Device: ATAK on Samsung tablet
 - Person: John Smith
-- Contact: (208)555-0780
+- Contact: ([YOUR_AREA_CODE])555-0780
 - Issued: 2025-11-24 (date enrolled)
 - Expires: 2027-11-24 (2 years)
 - Status: Active
-- Groups: All Users, CCVFD Operations
+- Groups: All Users, [YOUR_ORG] Operations
 - Role: USER
 - Method: Enrollment
 ```
@@ -364,18 +495,80 @@ Add to certificate inventory spreadsheet:
 
 **User gets "Connection failed" after enrollment:**
 - Certificate may not have installed properly
-- Check ATAK → Settings → Network → Manage SSL/TLS Certificates
-- Should see CCFIRE780 certificate listed
+- Check ATAK -> Settings -> Network -> Manage SSL/TLS Certificates
+- Should see [YOUR_PREFIX]780 certificate listed
 - If missing, retry enrollment
 
 **Enrollment works but can't see missions:**
 - User enrolled successfully but not in right groups
-- Web UI → User Manager → CCFIRE780 → Edit groups
+- Web UI -> User Manager -> [YOUR_PREFIX]780 -> Edit groups
 - Add to appropriate groups
 
 ---
 
-#### 2.2.2 Creating User via Pre-Generated Certificates (Manual Method)
+#### 2.2.2 Creating User via Quick Connect (Let's Encrypt)
+
+This is the simplest method when your TAK Server uses Let's Encrypt certificates.
+
+**Step 1: Create User in Web UI**
+```
+1. Access: https://[YOUR_DOMAIN]:8443
+2. Login with webadmin.p12
+3. User Manager -> "Add User"
+4. Fill in:
+   - Username: [YOUR_PREFIX]780
+   - Password: [Create strong password]
+   - First Name: John
+   - Last Name: Smith
+   - Role: USER
+5. Add to appropriate groups
+6. Save
+```
+
+**Step 2: Provide User with Connection Info**
+
+Give the user ONLY:
+- Server address: `[YOUR_DOMAIN]`
+- Port: `8089`
+- Username: `[YOUR_PREFIX]780`
+- Password: `[password you set]`
+
+No data package or certificate files needed!
+
+**Step 3: User Quick Connect Process (User does this)**
+
+**In ATAK:**
+```
+1. Open ATAK
+2. Tap hamburger menu -> Settings
+3. Network -> TAK Servers
+4. Tap menu (three dots) -> Add
+5. Enter:
+   - Description: [YOUR_ORG] TAK
+   - Address: [YOUR_DOMAIN]
+   - Port: 8089
+   - Protocol: SSL
+   - Check "Use Authentication"
+   - Username: [YOUR_PREFIX]780
+   - Password: [password]
+6. Tap OK
+7. Wait for "TAK Server registration succeeded"
+8. Connection established!
+```
+
+**Step 4: Verify and Document**
+
+Same as Section 2.2.1 Steps 4-5.
+
+**Optional: QR Code Enrollment**
+
+For even faster onboarding, generate QR codes containing connection info. Users scan with phone camera, which opens ATAK and auto-populates settings.
+
+See: https://github.com/sgofferj/TAK-mass-enrollment
+
+---
+
+#### 2.2.3 Creating User via Pre-Generated Certificates (Manual Method)
 
 **Prerequisites:**
 - Username decided (follow naming convention)
@@ -394,10 +587,10 @@ lxc exec tak -- bash
 cd /opt/tak/certs
 
 # Create certificate
-sudo ./makeCert.sh client CCFIRE780
+sudo ./makeCert.sh client [YOUR_PREFIX]780
 
-# Certificate created: /opt/tak/certs/files/CCFIRE780.p12
-# This creates a certificate with CN=CCFIRE780
+# Certificate created: /opt/tak/certs/files/[YOUR_PREFIX]780.p12
+# This creates a certificate with CN=[YOUR_PREFIX]780
 ```
 
 **Step 2: Copy Certificate to Host**
@@ -406,71 +599,72 @@ sudo ./makeCert.sh client CCFIRE780
 exit
 
 # From VPS host
-lxc file pull tak/opt/tak/certs/files/CCFIRE780.p12 ~/CCFIRE780.p12
+lxc file pull tak/opt/tak/certs/files/[YOUR_PREFIX]780.p12 ~/[YOUR_PREFIX]780.p12
 
 # Verify
-ls -lh ~/CCFIRE780.p12
+ls -lh ~/[YOUR_PREFIX]780.p12
 
 # Download to your local machine
-scp takadmin@your-vps-ip:~/CCFIRE780.p12 ./
+scp takadmin@[VPS_IP]:~/[YOUR_PREFIX]780.p12 ./
 ```
 
 **Step 3: Create Matching User in Web UI**
 ```
 CRITICAL: Username must EXACTLY match certificate name (case-sensitive)
 
-1. Access: https://tak.pinenut.tech:8443
+1. Access: https://[YOUR_DOMAIN]:8443
 2. Login with webadmin.p12
-3. User Manager → "Add User"
+3. User Manager -> "Add User"
 4. Fill in:
-   - Username: CCFIRE780 (MUST match cert name exactly)
+   - Username: [YOUR_PREFIX]780 (MUST match cert name exactly)
    - Password: (leave blank - not needed for cert-based auth)
    - First Name: John
    - Last Name: Smith
    - Role: USER (or ADMIN for leadership)
 5. Add to appropriate groups:
    - All Users (everyone gets this)
-   - CCVFD Operations (or appropriate group)
+   - [YOUR_ORG] Operations (or appropriate group)
    - Additional groups as needed
 6. Save
 ```
 
 **How They Connect:**
 ```
-When user connects with CCFIRE780.p12:
-1. Certificate presents CN=CCFIRE780 to TAK Server
-2. TAK Server looks up user "CCFIRE780" in database
-3. Finds match → Grants access with assigned groups/role
+When user connects with [YOUR_PREFIX]780.p12:
+1. Certificate presents CN=[YOUR_PREFIX]780 to TAK Server
+2. TAK Server looks up user "[YOUR_PREFIX]780" in database
+3. Finds match -> Grants access with assigned groups/role
 4. User sees missions based on group membership
 ```
 
 **Common Mistakes:**
-- ❌ Cert: CCFIRE780.p12, User: CCFIRE-780 (hyphen) → No match, connection fails
-- ❌ Cert: ccfire780.p12, User: CCFIRE780 (case) → No match, connection fails
-- ❌ Cert: CCFIRE780.p12, User: not created → Connection fails (no authorization)
+- Cert: [YOUR_PREFIX]780.p12, User: [YOUR_PREFIX]-780 (hyphen) -> No match, fails
+- Cert: [your_prefix]780.p12, User: [YOUR_PREFIX]780 (case) -> No match, fails
+- Cert: [YOUR_PREFIX]780.p12, User: not created -> Connection fails
 
 **Step 4: Distribute Certificate**
-- Send CCFIRE780.p12 to user
-- Send certificate password: `atakatak` (or your password)
+- Send [YOUR_PREFIX]780.p12 to user
+- Send certificate password: `[CERT_PASSWORD]`
 - Send installation instructions
 - Inform user which groups they're in
 
 **Step 5: Document in Inventory**
 Add to certificate inventory spreadsheet:
-- Username: CCFIRE780
+- Username: [YOUR_PREFIX]780
 - Device: ATAK on Samsung tablet
 - Person: John Smith
-- Contact: (208)555-0780
+- Contact: ([YOUR_AREA_CODE])555-0780
 - Issued: 2025-11-24
 - Expires: 2027-11-24
 - Status: Active
-- Groups: All Users, CCVFD Operations
+- Groups: All Users, [YOUR_ORG] Operations
 - Role: USER
+- Method: Pre-generated
 
 **Step 6: Verify User Can Connect**
 After user imports certificate:
-1. Check Web UI → User Manager
-2. Look for CCFIRE780
+1. Check Web UI -> User Manager
+2. Look for [YOUR_PREFIX]780
 3. Status should show "Connected" when user is online
 4. Verify user can access expected missions
 
@@ -482,11 +676,7 @@ If you skip Step 3 (creating user in web UI), TAK Server may automatically creat
 - Have USER role (not ADMIN)
 - Require manual group assignment after creation
 
-**Best Practice:** Always create the user in web UI BEFORE distributing certificate. This ensures:
-- ✅ Groups assigned before first connection
-- ✅ Role set correctly (USER vs ADMIN)
-- ✅ User has proper access immediately
-- ✅ No delay waiting for admin to fix permissions
+**Best Practice:** Always create the user in web UI BEFORE distributing certificate.
 
 ### 2.3 Multi-Device User Setup
 
@@ -496,57 +686,57 @@ If you skip Step 3 (creating user in web UI), TAK Server may automatically creat
 ```bash
 lxc exec tak -- bash
 cd /opt/tak/certs
-sudo ./makeCert.sh client CCFIRE780
+sudo ./makeCert.sh client [YOUR_PREFIX]780
 exit
 
-lxc file pull tak/opt/tak/certs/files/CCFIRE780.p12 ~/CCFIRE780.p12
+lxc file pull tak/opt/tak/certs/files/[YOUR_PREFIX]780.p12 ~/[YOUR_PREFIX]780.p12
 ```
 
 **Step 2: Create Secondary Certificate (WinTAK)**
 ```bash
 lxc exec tak -- bash
 cd /opt/tak/certs
-sudo ./makeCert.sh client CCFIRE780-wt
+sudo ./makeCert.sh client [YOUR_PREFIX]780-wt
 exit
 
-lxc file pull tak/opt/tak/certs/files/CCFIRE780-wt.p12 ~/CCFIRE780-wt.p12
+lxc file pull tak/opt/tak/certs/files/[YOUR_PREFIX]780-wt.p12 ~/[YOUR_PREFIX]780-wt.p12
 ```
 
 **Step 3: Add Both to Web UI**
 Create two users:
-1. Username: `CCFIRE780` (ATAK)
-2. Username: `CCFIRE780-wt` (WinTAK)
+1. Username: `[YOUR_PREFIX]780` (ATAK)
+2. Username: `[YOUR_PREFIX]780-wt` (WinTAK)
 
 **Step 4: Add Both to Same Groups**
 Create a meta-group:
-- Group name: "CCFIRE780 - All Devices"
-- Members: CCFIRE780, CCFIRE780-wt
+- Group name: "[YOUR_PREFIX]780 - All Devices"
+- Members: [YOUR_PREFIX]780, [YOUR_PREFIX]780-wt
 
 Then add meta-group to operational groups:
-- Group "Fire Operations" → Add "CCFIRE780 - All Devices"
+- Group "[YOUR_ORG] Operations" -> Add "[YOUR_PREFIX]780 - All Devices"
 
 **Benefit:** User sees same missions on both devices
 
 ### 2.4 Editing Users
 
 **Change User Groups:**
-1. Web UI → User Manager
-2. Search for user: `CCFIRE780`
+1. Web UI -> User Manager
+2. Search for user: `[YOUR_PREFIX]780`
 3. Click username
 4. Modify groups (add/remove)
 5. Save
 
 **Change User Role:**
-1. Web UI → User Manager
+1. Web UI -> User Manager
 2. Click username
-3. Change role: USER → ADMIN (or vice versa)
+3. Change role: USER -> ADMIN (or vice versa)
 4. Save
 
 **Note:** Cannot change username. To rename, must:
 1. Create new user with new name
 2. Migrate groups/permissions
 3. Delete old user
-4. User loses mission subscriptions (bad!)
+4. User loses mission subscriptions
 
 **Recommendation:** Get username right the first time!
 
@@ -558,7 +748,7 @@ Then add meta-group to operational groups:
 3. User can be re-enabled with new certificate
 
 **Delete User (Permanent):**
-1. Web UI → User Manager
+1. Web UI -> User Manager
 2. Find user
 3. Delete user
 4. User loses all mission subscriptions
@@ -576,7 +766,7 @@ Then add meta-group to operational groups:
 ```bash
 lxc exec tak -- bash
 cd /opt/tak/certs/files
-keytool -list -v -keystore CCFIRE780.p12 -storepass atakatak | grep "Valid"
+keytool -list -v -keystore [YOUR_PREFIX]780.p12 -storepass [CERT_PASSWORD] | grep "Valid"
 ```
 
 **Check 2: Certificate Revoked?**
@@ -586,8 +776,8 @@ openssl crl -in crl.pem -text -noout | grep -A 5 "Serial"
 ```
 
 **Check 3: User Exists in Web UI?**
-1. Web UI → User Manager
-2. Search: CCFIRE780
+1. Web UI -> User Manager
+2. Search: [YOUR_PREFIX]780
 3. If not found, create user entry
 
 **Check 4: Groups Correct?**
@@ -613,57 +803,57 @@ openssl crl -in crl.pem -text -noout | grep -A 5 "Serial"
 - Simplify permission management
 
 **Types:**
-- **Organizational:** Based on agency (CCVFD, BCSO)
+- **Organizational:** Based on agency ([YOUR_ORG], [PARTNER_ORG])
 - **Functional:** Based on role (Leadership, Operations, Support)
 - **Operational:** Based on mission type (Fire Ops, Law Enforcement, Medical)
 - **Meta:** Groups of users (multi-device users)
 
 ### 3.2 Recommended Group Structure
 
-**For Clear Creek VFD / Boise County SO:**
+**For [YOUR_ORG_FULL] / [PARTNER_ORG_FULL]:**
 
 ```
 All Users (Everyone)
-├── CCVFD (All CCVFD Personnel)
-│   ├── CCVFD Leadership
-│   ├── CCVFD Operations
-│   ├── CCVFD Support
-│   └── CCVFD Training
-├── BCSO (All Sheriff's Office)
-│   ├── BCSO Leadership
-│   ├── BCSO Patrol
-│   ├── BCSO Investigations
-│   └── BCSO Support
-├── Mutual Aid (External agencies)
-│   ├── State Resources
-│   └── Federal Resources
-└── Special Operations
-    ├── Incident Command
-    ├── SAR Operations
-    └── Hazmat Operations
++-- [YOUR_ORG] (All [YOUR_ORG] Personnel)
+|   +-- [YOUR_ORG] Leadership
+|   +-- [YOUR_ORG] Operations
+|   +-- [YOUR_ORG] Support
+|   +-- [YOUR_ORG] Training
++-- [PARTNER_ORG] (All [PARTNER_ORG])
+|   +-- [PARTNER_ORG] Leadership
+|   +-- [PARTNER_ORG] Patrol
+|   +-- [PARTNER_ORG] Investigations
+|   +-- [PARTNER_ORG] Support
++-- Mutual Aid (External agencies)
+|   +-- State Resources
+|   +-- Federal Resources
++-- Special Operations
+    +-- Incident Command
+    +-- SAR Operations
+    +-- Hazmat Operations
 ```
 
 **Meta-Groups for Multi-Device Users:**
 ```
 User-Specific Device Groups
-├── CCFIRE780 - All Devices
-│   ├── CCFIRE780 (ATAK)
-│   ├── CCFIRE780-wt (WinTAK)
-│   └── CCFIRE780-it (iTAK)
-├── BCSO2240 - All Devices
-│   ├── BCSO2240 (ATAK)
-│   └── BCSO2240-wt (WinTAK)
++-- [YOUR_PREFIX]780 - All Devices
+|   +-- [YOUR_PREFIX]780 (ATAK)
+|   +-- [YOUR_PREFIX]780-wt (WinTAK)
+|   +-- [YOUR_PREFIX]780-it (iTAK)
++-- [PARTNER_PREFIX]2240 - All Devices
+    +-- [PARTNER_PREFIX]2240 (ATAK)
+    +-- [PARTNER_PREFIX]2240-wt (WinTAK)
 ```
 
 ### 3.3 Creating Groups
 
 **Web UI Method:**
-1. Access: https://tak.pinenut.tech:8443
-2. Data Sync → Groups
+1. Access: https://[YOUR_DOMAIN]:8443
+2. Data Sync -> Groups
 3. Click "Add Group"
 4. Fill in:
-   - Group Name: `CCVFD Operations`
-   - Description: `CCVFD operational personnel`
+   - Group Name: `[YOUR_ORG] Operations`
+   - Description: `[YOUR_ORG] operational personnel`
    - Type: `Group`
 5. Add members (users or other groups)
 6. Save
@@ -677,9 +867,9 @@ User-Specific Device Groups
 ### 3.4 Adding Users to Groups
 
 **Single User:**
-1. Groups → Select group
+1. Groups -> Select group
 2. Click "Add Member"
-3. Search for user: `CCFIRE780`
+3. Search for user: `[YOUR_PREFIX]780`
 4. Add user
 5. Save
 
@@ -689,7 +879,7 @@ User-Specific Device Groups
 3. Or create parent group and add all at once
 
 **Multi-Device User:**
-1. Create meta-group: "CCFIRE780 - All Devices"
+1. Create meta-group: "[YOUR_PREFIX]780 - All Devices"
 2. Add all device certs to meta-group
 3. Add meta-group to operational groups
 
@@ -751,8 +941,8 @@ User-Specific Device Groups
 ### 4.2 Creating Missions
 
 **Web UI Method:**
-1. Access: https://tak.pinenut.tech:8443
-2. Data Sync → Missions
+1. Access: https://[YOUR_DOMAIN]:8443
+2. Data Sync -> Missions
 3. Click "Create Mission"
 4. Fill in:
    - Name: `Structure Fire - 123 Main St`
@@ -764,7 +954,7 @@ User-Specific Device Groups
 
 **ATAK Method:**
 Users can create missions from ATAK:
-1. ATAK → Mission
+1. ATAK -> Mission
 2. Tap "+"
 3. Enter mission name
 4. Sync to server
@@ -778,7 +968,7 @@ Examples:
 - `Fire - 123 Main St - 2025-11-24`
 - `SAR - Lost Hiker - 2025-11-24`
 - `Training - Fire Ops - 2025-11-24`
-- `Daily Ops - CCVFD - 2025-11-24`
+- `Daily Ops - [YOUR_ORG] - 2025-11-24`
 
 ### 4.3 Mission Lifecycle
 
@@ -802,7 +992,7 @@ Examples:
 ### 4.4 Managing Active Missions
 
 **Add Users to Mission:**
-1. Web UI → Data Sync → Missions
+1. Web UI -> Data Sync -> Missions
 2. Click mission name
 3. "Manage Access"
 4. Add groups or individual users
@@ -826,7 +1016,7 @@ Examples:
 ### 4.5 Mission Data Management
 
 **View Mission Contents:**
-1. Web UI → Mission
+1. Web UI -> Mission
 2. Click mission name
 3. View:
    - CoT events (markers)
@@ -853,18 +1043,18 @@ Examples:
 **User Can't See Mission:**
 
 **Check 1: User in Right Group?**
-1. Web UI → User Manager → Find user
+1. Web UI -> User Manager -> Find user
 2. Check groups
 3. Compare to mission's allowed groups
 
 **Check 2: Mission Access Settings**
-1. Web UI → Missions → Click mission
+1. Web UI -> Missions -> Click mission
 2. Check "Allowed Groups"
 3. Add user's group if missing
 
 **Check 3: User Subscribed?**
 Users must subscribe to missions in ATAK:
-1. ATAK → Mission
+1. ATAK -> Mission
 2. Search for mission
 3. Subscribe
 
@@ -879,7 +1069,7 @@ lxc exec tak -- systemctl status takserver
 User must have internet connection to sync
 
 **Check 3: Data Sync Enabled?**
-1. Web UI → User Manager
+1. Web UI -> User Manager
 2. Check user has Data Sync role
 
 ---
@@ -897,7 +1087,7 @@ cd /opt/tak/certs/files
 
 for cert in *.p12; do
     echo "=== $cert ==="
-    keytool -list -v -keystore "$cert" -storepass atakatak 2>/dev/null | grep "Valid until"
+    keytool -list -v -keystore "$cert" -storepass [CERT_PASSWORD] 2>/dev/null | grep "Valid until"
 done | grep -B 1 "2026-02"  # Adjust date range
 ```
 
@@ -911,7 +1101,7 @@ See [04-CERTIFICATE-MANAGEMENT.md](04-CERTIFICATE-MANAGEMENT.md) - Step 7
 # Immediate revocation
 lxc exec tak -- bash
 cd /opt/tak/certs
-sudo ./makeCert.sh revoke CCFIRE780
+sudo ./makeCert.sh revoke [YOUR_PREFIX]780
 sudo ./makeCert.sh crl
 sudo systemctl restart takserver
 ```
@@ -919,10 +1109,10 @@ sudo systemctl restart takserver
 **Issue Replacement:**
 ```bash
 # New cert with same name (if same person, new device)
-sudo ./makeCert.sh client CCFIRE780
+sudo ./makeCert.sh client [YOUR_PREFIX]780
 
 # Or backup designation (if using backup device)
-sudo ./makeCert.sh client CCFIRE780-bk
+sudo ./makeCert.sh client [YOUR_PREFIX]780-bk
 ```
 
 ### 5.3 Certificate Inventory
@@ -956,48 +1146,30 @@ TAK Server creates different types of certificates during installation. Understa
 **Used in:**
 - Desktop web browsers (Firefox, Chrome, Edge)
 - Imported into browser's certificate manager
-- Access URL: `https://tak.pinenut.tech:8443`
+- Access URL: `https://[YOUR_DOMAIN]:8443`
 
 **What you can do with it:**
-- ✅ Full server administration
-- ✅ User management (create, delete, modify users)
-- ✅ Group management (create groups, assign members)
-- ✅ Mission management (view, delete missions)
-- ✅ View server status and logs
-- ✅ Configuration changes
-- ✅ Certificate management via web UI
-- ✅ Database queries and reports
+- Full server administration
+- User management (create, delete, modify users)
+- Group management (create groups, assign members)
+- Mission management (view, delete missions)
+- View server status and logs
+- Configuration changes
+- Certificate management via web UI
+- Database queries and reports
 
 **What you CANNOT do:**
-- ❌ Use in ATAK/WinTAK/iTAK (won't work)
-- ❌ Connect to TAK Server as a field client
-- ❌ Create missions from the field
-- ❌ Send/receive CoT data
+- Use in ATAK/WinTAK/iTAK (won't work)
+- Connect to TAK Server as a field client
+- Create missions from the field
+- Send/receive CoT data
 
 **Protocol:** HTTPS client certificate authentication  
 **Port:** 8443
 
-**Real-world usage:**
-```
-Fire Chief sits down at office computer:
-1. Opens Firefox (webadmin.p12 already imported)
-2. Goes to https://tak.pinenut.tech:8443
-3. Browser automatically presents webadmin.p12
-4. Creates new user certificate for rookie firefighter
-5. Adds user to "CCVFD Operations" group
-6. Checks server health
-7. Closes browser
-```
-
-**Distribution:**
-- Import into browser on administrator's office computer
-- Can be shared among multiple administrators
-- Each admin imports same webadmin.p12 into their browser
-- Password protect when distributing
-
 **Important:** This certificate has **complete control** over the TAK Server. Treat it like a root password.
 
-#### Type 2: Regular User Certificates (CCFIRE750.p12, CCFIRE760.p12, etc.)
+#### Type 2: Regular User Certificates ([YOUR_PREFIX]750.p12, [YOUR_PREFIX]760.p12, etc.)
 
 **Purpose:** Client authentication for ATAK/WinTAK/iTAK field applications
 
@@ -1011,42 +1183,22 @@ Fire Chief sits down at office computer:
 - TAK-X
 
 **What you can do with it:**
-- ✅ Connect to TAK Server
-- ✅ Send/receive CoT data
-- ✅ View missions (based on group membership)
-- ✅ Subscribe to missions
-- ✅ Add data to missions (markers, photos, files)
-- ✅ View other users on map
-- ✅ Send messages
-- ✅ Access Data Sync
+- Connect to TAK Server
+- Send/receive CoT data
+- View missions (based on group membership)
+- Subscribe to missions
+- Add data to missions (markers, photos, files)
+- View other users on map
+- Send messages
+- Access Data Sync
 
 **What you CANNOT do (unless admin role assigned):**
-- ❌ Access web UI at :8443
-- ❌ Create/delete users
-- ❌ Manage server configuration
+- Access web UI at :8443
+- Create/delete users
+- Manage server configuration
 
 **Protocol:** SSL/TLS client certificate authentication  
 **Port:** 8089 (main), 8446 (enrollment)
-
-**Real-world usage:**
-```
-Firefighter CCFIRE760 in the field:
-1. Opens ATAK on tablet
-2. ATAK connects using CCFIRE760.p12
-3. Sees current missions based on group membership
-4. Subscribes to "Structure Fire - 123 Main St" mission
-5. Drops markers on map
-6. Takes photos and uploads to mission
-7. Sends position updates (CoT)
-8. Coordinates with other firefighters on mission
-```
-
-**Distribution:**
-- One certificate per user per device
-- Follow naming convention: CCFIRE760, CCFIRE760-wt, etc.
-- Secure distribution (encrypted channels)
-- User imports into ATAK/WinTAK
-- Track in certificate inventory
 
 **Important:** Each user gets their own certificate. Never share certificates between users.
 
@@ -1055,15 +1207,9 @@ Firefighter CCFIRE760 in the field:
 **Created:** During TAK Server installation  
 **Location:** `/opt/tak/certs/files/admin.p12`
 
-**Purpose (Theoretical):**
-- Generic admin-level client certificate
-- Pre-created for convenience
-- Has admin role by default
+**Purpose:** Generic admin-level client certificate (pre-created for convenience)
 
-**Purpose (Reality):**
-- **Typically never used**
-- Better to create named certificates with admin roles
-- Sits unused in certs directory
+**Reality:** **Typically never used** - Better to create named certificates with admin roles
 
 **Why you shouldn't use it:**
 - Doesn't follow naming convention
@@ -1072,49 +1218,34 @@ Firefighter CCFIRE760 in the field:
 - Difficult to revoke if compromised
 - No accountability
 
-**What to do instead:**
-
-**Best Practice for CCVFD:**
+**Best Practice:**
 ```bash
 # Don't use admin.p12
 # Instead, create certificates for actual personnel:
 
-# Fire Chief (needs admin privileges)
 cd /opt/tak/certs
-sudo ./makeCert.sh client CCFIRE750      # Chief's ATAK
-sudo ./makeCert.sh client CCFIRE750-wt   # Chief's WinTAK
+sudo ./makeCert.sh client [YOUR_PREFIX]750      # Chief's ATAK
+sudo ./makeCert.sh client [YOUR_PREFIX]750-wt   # Chief's WinTAK
 
 # Then in Web UI:
-# User Manager → Find "CCFIRE750"
-# Change Role: USER → ADMIN
+# User Manager -> Find "[YOUR_PREFIX]750"
+# Change Role: USER -> ADMIN
 # Save
-
-# Now CCFIRE750 has admin privileges in ATAK/WinTAK
-# Plus follows your naming convention
-# Plus you know exactly who has admin access
 ```
-
-**Summary:**
-```
-❌ Don't use: admin.p12 (generic, untraceable)
-✅ Do use: CCFIRE750.p12 with admin role assigned
-```
-
-The generic `admin.p12` file will just sit in `/opt/tak/certs/files/` forever unused. That's fine and normal.
 
 #### Certificate Comparison Chart
 
-| Feature | webadmin.p12 | CCFIRE750.p12 (with admin role) | CCFIRE760.p12 (regular user) |
-|---------|--------------|----------------------------------|------------------------------|
-| **Access Web UI** | ✅ Yes | ❌ No | ❌ No |
-| **Use in ATAK** | ❌ No | ✅ Yes | ✅ Yes |
-| **Manage users** | ✅ Via Web UI | ❌ No | ❌ No |
-| **Create missions** | ✅ Via Web UI | ✅ From ATAK | ✅ From ATAK |
-| **Delete missions** | ✅ Via Web UI | ✅ From ATAK | ❌ No |
-| **View all users** | ✅ Yes | ❌ No | ❌ No |
-| **Change server config** | ✅ Yes | ❌ No | ❌ No |
-| **Send CoT** | ❌ No | ✅ Yes | ✅ Yes |
-| **Field operations** | ❌ No | ✅ Yes | ✅ Yes |
+| Feature | webadmin.p12 | [YOUR_PREFIX]750 (admin role) | [YOUR_PREFIX]760 (user) |
+|---------|--------------|-------------------------------|-------------------------|
+| **Access Web UI** | Yes | No | No |
+| **Use in ATAK** | No | Yes | Yes |
+| **Manage users** | Via Web UI | No | No |
+| **Create missions** | Via Web UI | From ATAK | From ATAK |
+| **Delete missions** | Via Web UI | From ATAK | No |
+| **View all users** | Yes | No | No |
+| **Change server config** | Yes | No | No |
+| **Send CoT** | No | Yes | Yes |
+| **Field operations** | No | Yes | Yes |
 | **Number needed** | 1 per server | 1 per admin per device | 1 per user per device |
 
 #### Certificate Roles in Web UI
@@ -1138,178 +1269,48 @@ When you create a user in the web UI, you assign a **role**:
 - **Note:** Still cannot access Web UI (that's webadmin.p12 only)
 - **Use for:** Leadership, incident commanders, senior officers
 
-**Example Setup for CCVFD:**
+**Example Setup for [YOUR_ORG]:**
 
 ```
 Leadership (Admin Role):
-- CCFIRE750 (Chief) → ADMIN role
-- CCFIRE751 (Asst Chief) → ADMIN role
-- CCFIRE752-759 (Officers) → ADMIN role (as appropriate)
+- [YOUR_PREFIX]750 (Chief) -> ADMIN role
+- [YOUR_PREFIX]751 (Asst Chief) -> ADMIN role
+- [YOUR_PREFIX]752-759 (Officers) -> ADMIN role (as appropriate)
 
 Operations (User Role):
-- CCFIRE760-779 (Firefighters) → USER role
+- [YOUR_PREFIX]760-779 (Members) -> USER role
 
 Web Administration:
-- webadmin.p12 → Used by Chief, Asst Chief, or IT/Communications staff
+- webadmin.p12 -> Used by Chief, Asst Chief, or IT/Communications staff
 - Imported into office computers
 ```
-
-#### Real-World Scenarios
-
-**Scenario 1: Fire Chief Full Setup**
-
-**Person:** Fire Chief (CCFIRE750)
-
-**Needs:**
-1. Server administration from office
-2. Field operations with admin privileges
-3. Command vehicle operations
-
-**Certificates:**
-```
-1. webadmin.p12
-   - Import into Firefox on office computer
-   - Use for: Creating users, managing groups, checking server health
-   
-2. CCFIRE750.p12 (ADMIN role)
-   - Import into ATAK on Samsung tablet
-   - Use for: Field operations, mission creation/management
-   
-3. CCFIRE750-wt.p12 (ADMIN role)
-   - Import into WinTAK on command vehicle laptop
-   - Use for: Command vehicle operations, larger screen
-```
-
-**Workflow:**
-
-```
-Monday morning at station:
-- Office computer → webadmin.p12 → Create certificate for new recruit
-- Add CCFIRE778 to "CCVFD Operations" group
-
-Structure fire callout:
-- Grab tablet → ATAK (CCFIRE750.p12)
-- Create mission "Structure Fire - 456 Oak St"
-- Invite all responding units
-- Manage tactical operations
-
-Command vehicle on-scene:
-- Laptop → WinTAK (CCFIRE750-wt.p12)
-- Same mission visible
-- Better overview on larger screen
-- Coordinate with mutual aid (WRFIRE250, etc.)
-```
-
-**Scenario 2: Regular Firefighter Setup**
-
-**Person:** Firefighter (CCFIRE760)
-
-**Needs:**
-1. Field operations only
-2. No server administration
-3. Phone for ATAK
-
-**Certificates:**
-```
-1. CCFIRE760.p12 (USER role)
-   - Import into ATAK on phone
-   - Use for: All field operations
-   
-2. (Optional) CCFIRE760-wt.p12 (USER role)
-   - Import into WinTAK on personal laptop
-   - Use for: Training, mission review at home
-```
-
-**What they can do:**
-- ✅ Connect to TAK Server
-- ✅ Subscribe to missions
-- ✅ Drop markers
-- ✅ Take photos and upload
-- ✅ Send messages
-- ✅ View other units
-
-**What they cannot do:**
-- ❌ Access web UI
-- ❌ Create/delete users
-- ❌ Delete missions (unless admin grants permission)
-- ❌ Change server settings
-
-**Scenario 3: Communications/IT Staff Setup**
-
-**Person:** Communications officer or IT staff (not actively responding to incidents)
-
-**Needs:**
-1. Server administration
-2. Minimal field operations (testing/support only)
-3. Office access primarily
-
-**Certificates:**
-```
-1. webadmin.p12
-   - Import into browser
-   - Use for: All server administration tasks
-   
-2. (Optional) Create CCFIRE7XX.p12 (USER or ADMIN role)
-   - For testing purposes
-   - Verify user experience
-   - Troubleshoot connection issues
-```
-
-**Typical tasks:**
-- Create user certificates
-- Manage groups
-- Monitor server health
-- Apply updates
-- Backup server
-- Troubleshoot issues
 
 #### Common Questions
 
 **Q: Can I use webadmin.p12 in ATAK?**  
 A: No. Different certificate types, different protocols. webadmin.p12 only works in web browsers for the :8443 web UI.
 
-**Q: Can I use my ATAK certificate (CCFIRE760.p12) in the web browser?**  
+**Q: Can I use my ATAK certificate ([YOUR_PREFIX]760.p12) in the web browser?**  
 A: No. It won't authenticate to the web UI. You need webadmin.p12 for that.
 
-**Q: Do I need both webadmin.p12 and CCFIRE750.p12 if I'm the chief?**  
-A: If you want both server administration (from office) AND field operations (from ATAK), then yes, you need both. They serve different purposes.
+**Q: Do I need both webadmin.p12 and [YOUR_PREFIX]750.p12 if I'm the chief?**  
+A: If you want both server administration (from office) AND field operations (from ATAK), then yes, you need both.
 
-**Q: What's the difference between ADMIN role and webadmin.p12?**  
-A: 
-- **ADMIN role** (CCFIRE750.p12): Enhanced privileges **within ATAK/WinTAK** (can delete missions, manage mission access)
-- **webadmin.p12**: Full server administration **via web browser** (manage users, groups, server config)
-
-**Q: Should I ever use the admin.p12 file created during install?**  
-A: No. Create named certificates (CCFIRE750, etc.) and assign ADMIN role instead. Better tracking and accountability.
-
-**Q: How many people should have webadmin.p12?**  
-A: As few as necessary. Typically:
-- Fire Chief
-- Assistant Chief (if helping with admin)
-- Communications/IT officer
-Maybe 1-3 people total. It's powerful - limit access.
-
-**Q: Can multiple people use the same webadmin.p12?**  
-A: Technically yes (they all import the same file), but then you can't tell who did what in the logs. Better to create separate webadmin certs if you need multiple web admins (advanced topic).
-
-**Q: Boise County Sheriff's Office wants TAK Server access. Do they need webadmin.p12?**  
-A: No! They just need their own client certificates (BCSO2230, BCSO2231, etc.). Only YOUR administrators need webadmin.p12 for YOUR server. BCSO users are just regular users from your server's perspective.
-
-**Q: What about Wilderness Ranch Fire or other mutual aid departments?**  
-A: Same as above - they get regular client certificates (WRFIRE250, WRFIRE251, etc.). Only administrators of THIS server need webadmin.p12.
+**Q: [PARTNER_ORG] wants TAK Server access. Do they need webadmin.p12?**  
+A: No! They just need their own client certificates ([PARTNER_PREFIX]2230, etc.). Only YOUR administrators need webadmin.p12 for YOUR server.
 
 #### Certificate Security Summary
 
 **webadmin.p12:**
-- 🔒 Extremely sensitive
+- Extremely sensitive
 - Treat like root password
 - Secure storage
 - Limited distribution (1-3 people max)
 - Track who has access
 - Revoke/recreate if compromised
 
-**User certificates (CCFIRE750.p12, etc.):**
-- 🔒 Sensitive
+**User certificates ([YOUR_PREFIX]750.p12, etc.):**
+- Sensitive
 - One per person per device
 - Secure distribution
 - Track in inventory
@@ -1317,38 +1318,9 @@ A: Same as above - they get regular client certificates (WRFIRE250, WRFIRE251, e
 - Revoke if device lost
 
 **admin.p12 (generic):**
-- ⚠️ Don't use
+- Don't use
 - Sits unused
 - That's okay and normal
-
-#### Summary: What You Actually Need
-
-**For Clear Creek VFD TAK Server:**
-
-```
-1 × webadmin.p12
-   → Imported into office computers (Chief, IT/Comms staff)
-   → Server administration via web UI
-   → Tightly controlled access
-
-∞ × CCFIRE###.p12 certificates
-   → One for each person, per device
-   → Follow naming convention (750-779)
-   → Assign ADMIN or USER role as appropriate
-   → Track in inventory
-
-∞ × WRFIRE###.p12, BCSO####.p12, etc.
-   → For mutual aid and multi-agency users
-   → Regular USER role (unless they're incident commanders)
-   → Track in inventory
-   
-0 × admin.p12 usage
-   → Ignore this file
-   → Never distribute it
-   → It just exists, that's fine
-```
-
-**Clean, organized, traceable, secure.**
 
 ---
 
@@ -1363,7 +1335,7 @@ A: Same as above - they get regular client certificates (WRFIRE250, WRFIRE251, e
 # TAK Server Health Check Script
 
 LOGFILE="/var/log/tak-health-check.log"
-EMAIL="admin@clearcrk.org"
+EMAIL="[ADMIN_EMAIL]"
 
 echo "=== TAK Server Health Check - $(date) ===" | tee -a $LOGFILE
 
@@ -1372,7 +1344,6 @@ if lxc info tak > /dev/null 2>&1; then
     echo "[OK] Container 'tak' is running" | tee -a $LOGFILE
 else
     echo "[ERROR] Container 'tak' is not running!" | tee -a $LOGFILE
-    # Send alert email
     exit 1
 fi
 
@@ -1426,7 +1397,6 @@ else
 fi
 
 echo "=== Health check complete ===" | tee -a $LOGFILE
-echo "" | tee -a $LOGFILE
 ```
 
 **Schedule with cron:**
@@ -1456,11 +1426,11 @@ lxc exec tak -- tail -f /var/log/postgresql/postgresql-14-main.log
 ```
 
 **What to Watch For:**
-- ❌ `ERROR` or `FATAL` messages
-- ⚠️ `SSL handshake failure` (certificate issues)
-- ⚠️ `Connection refused` (port/firewall issues)
-- ⚠️ `Out of memory` (resource issues)
-- ⚠️ `Database connection failed` (PostgreSQL issues)
+- `ERROR` or `FATAL` messages
+- `SSL handshake failure` (certificate issues)
+- `Connection refused` (port/firewall issues)
+- `Out of memory` (resource issues)
+- `Database connection failed` (PostgreSQL issues)
 
 ### 6.3 Performance Metrics
 
@@ -1525,9 +1495,6 @@ ls -lh ~/backups/tak-${BACKUP_DATE}/
 # Compress for archiving
 cd ~/backups
 tar -czf tak-backup-${BACKUP_DATE}.tar.gz tak-${BACKUP_DATE}/
-
-# Copy to secure off-site storage
-# scp tak-backup-${BACKUP_DATE}.tar.gz user@backup-server:~/
 ```
 
 ### 7.3 Automated Backup Script
@@ -1575,12 +1542,6 @@ rm -rf ${BACKUP_NAME}-*
 echo "Removing backups older than ${RETENTION_DAYS} days..."
 find ${BACKUP_DIR} -name "tak-backup-*.tar.gz" -mtime +${RETENTION_DAYS} -delete
 
-# Remove old snapshots
-lxc info tak | grep -E "tak-backup-" | awk '{print $1}' | while read snap; do
-    SNAP_AGE=$(lxc info tak | grep -A 5 "$snap" | grep "Created:" | awk '{print $2}')
-    # Add date comparison logic here if needed
-done
-
 echo "Backup complete: ${BACKUP_DIR}/${BACKUP_NAME}.tar.gz"
 ```
 
@@ -1588,9 +1549,6 @@ echo "Backup complete: ${BACKUP_DIR}/${BACKUP_NAME}.tar.gz"
 ```bash
 # Daily backup at 2 AM
 0 2 * * * /root/backup-tak.sh >> /var/log/tak-backup.log 2>&1
-
-# Weekly full backup on Sunday
-0 3 * * 0 /root/backup-tak-full.sh >> /var/log/tak-backup-full.log 2>&1
 ```
 
 ### 7.4 Backup Verification
@@ -1675,11 +1633,11 @@ lxc exec tak -- journalctl -u takserver -n 100
 **Level 1: Network**
 ```bash
 # Can host reach TAK Server?
-ping tak.pinenut.tech
+ping [YOUR_DOMAIN]
 
 # Are ports open?
-telnet tak.pinenut.tech 8089
-telnet tak.pinenut.tech 8443
+telnet [YOUR_DOMAIN] 8089
+telnet [YOUR_DOMAIN] 8443
 ```
 
 **Level 2: Server**
@@ -1695,20 +1653,15 @@ lxc exec tak -- ss -tulpn | grep 8089
 ```bash
 # Is user's certificate valid?
 cd /opt/tak/certs/files
-keytool -list -v -keystore CCFIRE780.p12 -storepass atakatak | grep "Valid"
+keytool -list -v -keystore [YOUR_PREFIX]780.p12 -storepass [CERT_PASSWORD] | grep "Valid"
 
 # Is certificate revoked?
 openssl crl -in crl.pem -text -noout | grep -A 5 "Serial"
 ```
 
 **Level 4: User Configuration**
-```bash
-# Does user exist in web UI?
-# Web UI → User Manager → Search for CCFIRE780
-
-# Is user in correct groups?
-# Check group membership
-```
+- Does user exist in web UI?
+- Is user in correct groups?
 
 ### 8.3 SSL Handshake Failures
 
@@ -1720,7 +1673,7 @@ openssl crl -in crl.pem -text -noout | grep -A 5 "Serial"
    ```
 
 2. **Wrong hostname in client**
-   - Client must connect to: `tak.pinenut.tech`
+   - Client must connect to: `[YOUR_DOMAIN]`
    - NOT IP address
    - Must match server certificate CN
 
@@ -1731,8 +1684,7 @@ openssl crl -in crl.pem -text -noout | grep -A 5 "Serial"
 
 4. **Expired certificate**
    ```bash
-   # Check expiration
-   keytool -list -v -keystore files/CCFIRE780.p12 -storepass atakatak | grep "Valid"
+   keytool -list -v -keystore files/[YOUR_PREFIX]780.p12 -storepass [CERT_PASSWORD] | grep "Valid"
    ```
 
 ### 8.4 Performance Issues
@@ -1758,18 +1710,12 @@ lxc exec tak -- sudo -u postgres psql -c "SELECT pg_size_pretty(pg_database_size
 
 # Active connections
 lxc exec tak -- sudo -u postgres psql -c "SELECT count(*) FROM pg_stat_activity;"
-
-# Slow queries
-lxc exec tak -- sudo -u postgres psql -c "SELECT query, state, query_start FROM pg_stat_activity WHERE state != 'idle' ORDER BY query_start;"
 ```
 
 **Check 3: Network**
 ```bash
-# Check bandwidth usage
-iftop
-
 # Check packet loss
-ping -c 100 tak.pinenut.tech | grep loss
+ping -c 100 [YOUR_DOMAIN] | grep loss
 ```
 
 **Solutions:**
@@ -1824,7 +1770,7 @@ lxc list
 ping 8.8.8.8
 
 # Can access host?
-ssh takadmin@your-vps-ip
+ssh takadmin@[VPS_IP]
 ```
 
 **Step 2: Attempt Quick Restart (5-10 minutes)**
@@ -1857,25 +1803,7 @@ lxc restart tak
 lxc exec tak -- systemctl status takserver
 ```
 
-**Step 4: If Snapshot Fails, Restore from Backup (20-60 minutes)**
-```bash
-# Create new container
-lxc copy tak tak-failed
-lxc delete tak
-lxc launch ubuntu:22.04 tak
-
-# Restore certificates
-lxc file push -r ~/backups/latest/certs/ tak/opt/tak/
-
-# Restore database
-lxc file push ~/backups/latest/database.sql tak/tmp/
-lxc exec tak -- sudo -u postgres psql cot < /tmp/database.sql
-
-# Reinstall TAK Server
-# Follow installation guide
-```
-
-**Step 5: Communicate Outage (Throughout)**
+**Step 4: Communicate Outage (Throughout)**
 ```
 Message to users:
 "TAK Server experiencing technical difficulties. 
@@ -1891,7 +1819,6 @@ Status updates every 15 minutes."
 **Immediate Actions:**
 1. **Isolate server**
    ```bash
-   # Disable network
    lxc config device remove tak eth0
    ```
 
@@ -1901,8 +1828,6 @@ Status updates every 15 minutes."
    ```
 
 3. **Identify compromised certificates**
-   - Review recent connections
-   - Check for unusual user activity
 
 4. **Revoke compromised certificates**
    ```bash
@@ -1913,16 +1838,8 @@ Status updates every 15 minutes."
    ```
 
 5. **Change passwords**
-   - Web UI admin password
-   - Certificate password (for new certs)
-   - PostgreSQL password
-   - Host system passwords
 
 6. **Document incident**
-   - Timeline of events
-   - Affected users/data
-   - Actions taken
-   - Lessons learned
 
 ### 9.3 Data Loss
 
@@ -1932,7 +1849,6 @@ Status updates every 15 minutes."
 
 1. **Restore from backup**
    ```bash
-   # Restore database
    lxc exec tak -- sudo -u postgres psql cot < backup-database.sql
    ```
 
@@ -1943,7 +1859,6 @@ Status updates every 15 minutes."
 
 3. **Request data from users**
    - Users may have mission data locally
-   - Can upload from ATAK data packages
 
 ### 9.4 Disaster Recovery Plan
 
@@ -1988,7 +1903,6 @@ Status updates every 15 minutes."
 AllowUsers takadmin
 
 # Use SSH keys, not passwords
-# Disable password authentication
 PasswordAuthentication no
 ```
 
@@ -2003,10 +1917,6 @@ PasswordAuthentication no
 **Firewall Rules:**
 ```bash
 # Only allow necessary ports
-# TAK Server: 8089, 8443, 8446, 9001
-# SSH: 22
-# HTTP/HTTPS: 80, 443 (for Let's Encrypt/HAProxy)
-
 ufw allow 22/tcp
 ufw allow 80/tcp
 ufw allow 443/tcp
@@ -2069,7 +1979,7 @@ ufw enable
 
 ### 11.1 Federation Setup
 
-**Purpose:** Share data between TAK Servers (CCVFD, BCSO, State)
+**Purpose:** Share data between TAK Servers ([YOUR_ORG], [PARTNER_ORG], State)
 
 **Not covered in detail here** - see TAK Server federation documentation
 
@@ -2086,8 +1996,8 @@ ufw enable
 **Setup:**
 1. Create mission on one agency's server
 2. Configure groups:
-   - CCVFD groups
-   - BCSO groups
+   - [YOUR_ORG] groups
+   - [PARTNER_ORG] groups
    - Mutual aid groups
 3. Invite users from all agencies
 4. All users subscribe to mission
@@ -2105,7 +2015,7 @@ ufw enable
 **Process:**
 1. Request certificate in advance
 2. Use "Mutual Aid" naming: `MUTUAL-AGENCY-UNIT`
-3. Example: `MUTUAL-GCFD-E1` (Garden City FD Engine 1)
+3. Example: `MUTUAL-[MUTUAL_AID_ORG]-E1` ([MUTUAL_AID_ORG] Engine 1)
 4. Add to "Mutual Aid" group only
 5. Limited mission access
 6. Revoke after incident
@@ -2198,9 +2108,9 @@ lxc exec tak -- ss -tulpn | grep -E "8089|8443|8446"
 ### Web UI URLs
 
 ```
-https://tak.pinenut.tech:8443        - Admin interface
-https://tak.pinenut.tech:8443/webtak  - WebTAK (if enabled)
-https://tak.pinenut.tech:8446         - Certificate enrollment
+https://[YOUR_DOMAIN]:8443        - Admin interface
+https://[YOUR_DOMAIN]:8443/webtak  - WebTAK (if enabled)
+https://[YOUR_DOMAIN]:8446         - Certificate enrollment
 ```
 
 ---
@@ -2214,7 +2124,7 @@ https://tak.pinenut.tech:8446         - Certificate enrollment
 
 ---
 
-*Last Updated: November 2025*  
+*Last Updated: [DATE]*  
 *Version: 1.0*  
 *For: TAK Server 5.5 in LXD containers*  
-*Agencies: Clear Creek VFD*
+*Organization: [YOUR_ORG_FULL]*
