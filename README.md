@@ -40,7 +40,7 @@ This project provides comprehensive documentation for deploying **TAK Server** (
 
 ### VPS Providers
 
-- ✅ **SSDNodes** - Primary testing platform
+- ✅ [**SSDNodes**](https://www.ssdnodes.com/manage/aff.php?aff=1554&register=true) - Primary testing platform (my referral link)
 - ✅ **DigitalOcean** - Should work with minimal adaptation
 - ⚠️ **Linode** - Not tested, standard Ubuntu VPS should work
 - ⚠️ **AWS EC2** - Not tested; AWS networking may require additional configuration
