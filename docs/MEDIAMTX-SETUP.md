@@ -131,11 +131,11 @@ apt install -y wget nano curl
 mkdir -p /opt/mediamtx
 cd /opt/mediamtx
 
-# Download latest release (check https://github.com/bluenviron/mediamtx/releases for current version)
-wget https://github.com/bluenviron/mediamtx/releases/download/v1.9.3/mediamtx_v1.9.3_linux_amd64.tar.gz
+# Download latest release (check [https://github.com/bluenviron/mediamtx/releases](https://github.com/bluenviron/mediamtx/releases) for current version)
+wget https://github.com/bluenviron/mediamtx/releases/download/v1.15.6/mediamtx_v1.15.6_linux_amd64.tar.gz
 
 # Extract
-tar -xzf mediamtx_v1.9.3_linux_amd64.tar.gz
+tar -xzf mediamtx_v1.15.6_linux_amd64.tar.gz
 
 # Verify
 ls -lh
