@@ -690,6 +690,153 @@ exit
 
 ---
 
+## Optional: External Web Access
+
+By default, Node-RED is only accessible within the LXD network or via SSH tunnel. To enable direct web access from the internet, configure HAProxy and add an LXD proxy device.
+
+> ⚠️ **Security Note:** Before enabling external access, ensure you have configured authentication in Step 7. Node-RED should never be exposed to the internet without password protection.
+
+---
+
+### External Access 1: Configure HAProxy
+
+📦 **Inside HAProxy Container**
+
+🖥️ **VPS Host**
+
+```bash
+lxc exec haproxy -- bash
+```
+
+📦 **Inside HAProxy Container**
+
+```bash
+nano /etc/haproxy/haproxy.cfg
+```
+
+**Add the following frontend and backend:**
+
+```haproxy
+frontend nodered-in
+    bind *:1880
+    mode http
+    option httplog
+    default_backend nodered-backend
+
+backend nodered-backend
+    mode http
+    server nodered 10.100.100.14:1880 check
+```
+
+**Reload HAProxy:**
+
+```bash
+systemctl reload haproxy
+```
+
+**Verify HAProxy is listening:**
+
+```bash
+ss -tulpn | grep 1880
+```
+
+Exit container:
+```bash
+exit
+```
+
+---
+
+### External Access 2: Open Firewall Port
+
+🖥️ **VPS Host**
+
+```bash
+sudo ufw allow 1880/tcp comment 'Node-RED'
+```
+
+---
+
+### External Access 3: Add LXD Proxy Device
+
+🖥️ **VPS Host**
+
+This creates a port forward from the VPS host to the HAProxy container:
+
+```bash
+lxc config device add haproxy proxy-1880 proxy listen=tcp:0.0.0.0:1880 connect=tcp:127.0.0.1:1880
+```
+
+**Verify the device was added:**
+
+```bash
+lxc config device show haproxy | grep -A 3 proxy-1880
+```
+
+**Expected output:**
+```
+proxy-1880:
+  connect: tcp:127.0.0.1:1880
+  listen: tcp:0.0.0.0:1880
+  type: proxy
+```
+
+---
+
+### External Access 4: Configure DNS
+
+Add a DNS record pointing to your VPS IP:
+
+| Type | Name | Value |
+|------|------|-------|
+| A | nodered.yourdomain.com | YOUR_VPS_IP |
+
+Or use an existing hostname (e.g., `tak.yourdomain.com:1880`).
+
+---
+
+### External Access 5: Test Access
+
+```bash
+curl -v http://nodered.yourdomain.com:1880/
+```
+
+You should see the Node-RED HTML response. Access the editor in your browser at:
+
+```
+http://nodered.yourdomain.com:1880/
+```
+
+---
+
+### Optional: HTTPS with Let's Encrypt
+
+For TLS encryption, you can extend HAProxy to terminate SSL on port 1880. This requires:
+
+1. Obtaining a certificate for your Node-RED hostname via certbot
+2. Configuring HAProxy with the certificate:
+
+```haproxy
+frontend nodered-in
+    bind *:1880 ssl crt /etc/haproxy/certs/nodered.pem
+    mode http
+    option httplog
+    default_backend nodered-backend
+```
+
+This is optional if you've already secured Node-RED with strong authentication and are comfortable with HTTP access.
+
+---
+
+### Quick Reference - External Access
+
+| Item | Value |
+|------|-------|
+| External URL | http://nodered.yourdomain.com:1880 |
+| HAProxy Frontend | nodered-in (port 1880) |
+| LXD Proxy Device | proxy-1880 |
+| Firewall Rule | UFW port 1880/tcp |
+
 ## Step 8: Example TAK Integration Flows
 
 ### 8.1 Display TAK Data on Web Worldmap
